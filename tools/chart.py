@@ -22,7 +22,7 @@ def draw(s):
         col = PAL[i % len(PAL)]; v = se["values"]
         if t == "line":
             ax.plot(list(x), v, color=col, lw=4, marker="o", ms=8, label=se.get("name"))
-            ax.annotate(f"{v[-1]:,}", (len(v) - 1, v[-1]), textcoords="offset points", xytext=(0, 12), ha="center", fontproperties=B, fontsize=15, color=col)
+            for k, val in enumerate(v): ax.annotate(f"{val:,}", (k, val), textcoords="offset points", xytext=(0, 12), ha="center", fontproperties=B, fontsize=15, color=col)
         elif t == "hbar":
             cols = [col] * len(v)
             ax.barh(labels, v, color=cols, height=0.6)
