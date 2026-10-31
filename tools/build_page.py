@@ -6,7 +6,10 @@ posts.json:
  "posts":[{"type":"딥|기초|이슈","title":"...","tags":"#태그1 #태그2 ...",
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
-body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span class='hl' 만 사용.
+post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
+body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span(class) 만 사용.
+  형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
+  글자색: red(핵심 숫자·리스크) / blue(제품명·회사명·용어 첫 등장)
 - 미리보기: 이미지를 data URI로 박아 넣음 (아티팩트는 외부 이미지를 못 띄움)
 - 복사용: 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
 """
@@ -15,12 +18,16 @@ import base64, html, json, re, sys, os
 REPO = "AXIOMedu/kong-blog-images"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+STYLES = {"hl": "background-color:#fff59d", "hl-g": "background-color:#d9f7be", "hl-b": "background-color:#cfe8ff",
+          "hl-p": "background-color:#ffd6e7", "red": "color:#e03131", "blue": "color:#1c6dd0"}
+
 def to_naver(body, sha):
     if not sha:  # 업로드 실패 시: 복사본에서 이미지 제외(미리보기에서 우클릭 복사)
         body = re.sub(r"<img[^>]*>", "", body)
     b = re.sub(r"<img[^>]*src=['\"]([^'\"]+)['\"][^>]*>",
                lambda m: f'<p style="text-align:center"><img src="https://raw.githubusercontent.com/{REPO}/{sha}/{m.group(1)}" style="max-width:100%"></p>', body)
-    b = re.sub(r"<span class=['\"]hl['\"]>", '<span style="background-color:#fff59d">', b)
+    for cls, style in STYLES.items():
+        b = re.sub(rf"<span class=['\"]{cls}['\"]>", f'<span style="{style}">', b)
     b = re.sub(r"<p>", '<p style="text-align:center">', b)
     b = re.sub(r"<h3>(.*?)</h3>", r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
     return b
@@ -38,6 +45,7 @@ def build(spec):
     for i, p in enumerate(spec["posts"]):
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"]),
                         "gpt": p.get("gpt_prompt", "")})
+        cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
         gpt = ""
         if p.get("gpt_prompt"):
             gpt = f'''<details class="gpt"><summary>사진 배경 바꾸고 싶을 때 (GPT 프롬프트)</summary>
@@ -50,7 +58,7 @@ def build(spec):
 <button type="button" class="ghost" data-act="title" data-i="{i}">제목 복사</button>
 <button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button>
 <span class="status" id="s{i}" role="status"></span></div>
-<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
+{cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
         secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 딥·기초·이슈 3편이 여기 채워져.</p></article></section>')
@@ -63,11 +71,11 @@ TEMPLATE = r"""<title>경제콩 발행함</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
 /* 레이아웃: 날짜 머리말 → 글마다 (유형·제목 / 복사 버튼 줄 / 네이버 본문 미리보기) */
-:root { --bg:#f3f5ef; --paper:#fff; --ink:#1d2318; --muted:#5f6b57; --bean:#2e9e22; --line:#dfe5d8; --mark:#fff27a;
+:root { --bg:#f3f5ef; --paper:#fff; --ink:#1d2318; --muted:#5f6b57; --bean:#2e9e22; --line:#dfe5d8; --mark:#fff27a; --mark-g:#d9f7be; --mark-b:#cfe8ff; --mark-p:#ffd6e7; --red:#e03131; --blue:#1c6dd0;
   --deep:#c8372d; --basic:#2f6fdf; --issue:#b7791f;
   --display:"Gowun Dodum","Noto Sans KR",system-ui,sans-serif; --body:"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#12160f; --paper:#1b2117; --ink:#e8eee2; --muted:#9aa892; --bean:#6fd65a; --line:#2c3527; --mark:#6b6320; --deep:#ff7a6e; --basic:#7aa7ff; --issue:#e2b04a; color-scheme:dark } }
-:root[data-theme="dark"] { --bg:#12160f; --paper:#1b2117; --ink:#e8eee2; --muted:#9aa892; --bean:#6fd65a; --line:#2c3527; --mark:#6b6320; --deep:#ff7a6e; --basic:#7aa7ff; --issue:#e2b04a; color-scheme:dark }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#12160f; --paper:#1b2117; --ink:#e8eee2; --muted:#9aa892; --bean:#6fd65a; --line:#2c3527; --mark:#6b6320; --mark-g:#3c5a2a; --mark-b:#24476b; --mark-p:#6b2f48; --red:#ff6b6b; --blue:#74b0ff; --deep:#ff7a6e; --basic:#7aa7ff; --issue:#e2b04a; color-scheme:dark } }
+:root[data-theme="dark"] { --bg:#12160f; --paper:#1b2117; --ink:#e8eee2; --muted:#9aa892; --bean:#6fd65a; --line:#2c3527; --mark:#6b6320; --mark-g:#3c5a2a; --mark-b:#24476b; --mark-p:#6b2f48; --red:#ff6b6b; --blue:#74b0ff; --deep:#ff7a6e; --basic:#7aa7ff; --issue:#e2b04a; color-scheme:dark }
 body { background:var(--bg); color:var(--ink); font-family:var(--body);
   padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:24px 64px; }
 .wrap { max-width:760px; margin:0 auto; display:grid; gap:28px; }
@@ -94,7 +102,9 @@ article { background:var(--paper); border:1px solid var(--line); border-radius:1
 article p { margin:0 0 1.1em; text-align:center; }
 article h3 { text-align:center; font-size:1.12rem; margin:1.6em 0 .7em; }
 article img { display:block; margin:8px auto 22px; border-radius:4px; }
-article .hl { background:var(--mark); }
+article .hl { background:var(--mark); } article .hl-g { background:var(--mark-g); } article .hl-b { background:var(--mark-b); } article .hl-p { background:var(--mark-p); }
+article .red { color:var(--red); } article .blue { color:var(--blue); }
+.cat { margin:0; font-size:.92rem; } .cat b { color:var(--bean); }
 .warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
