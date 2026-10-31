@@ -16,6 +16,8 @@ REPO = "AXIOMedu/kong-blog-images"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def to_naver(body, sha):
+    if not sha:  # 업로드 실패 시: 복사본에서 이미지 제외(미리보기에서 우클릭 복사)
+        body = re.sub(r"<img[^>]*>", "", body)
     b = re.sub(r"<img[^>]*src=['\"]([^'\"]+)['\"][^>]*>",
                lambda m: f'<p style="text-align:center"><img src="https://raw.githubusercontent.com/{REPO}/{sha}/{m.group(1)}" style="max-width:100%"></p>', body)
     b = re.sub(r"<span class=['\"]hl['\"]>", '<span style="background-color:#fff59d">', b)
@@ -52,7 +54,8 @@ def build(spec):
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
         secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 딥·기초·이슈 3편이 여기 채워져.</p></article></section>')
-    return TEMPLATE.replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
+    warn = "" if spec.get("sha") else '<p class="warn">오늘은 이미지 업로드가 실패했어. 본문 복사엔 사진이 빠져 있으니, 미리보기 사진을 우클릭 → 이미지 복사로 넣어줘.</p>'
+    return TEMPLATE.replace("__WARN__", warn).replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
                    .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False).replace("</", "<\\/"))
 
 TEMPLATE = r"""<title>경제콩 발행함</title>
@@ -92,12 +95,14 @@ article p { margin:0 0 1.1em; text-align:center; }
 article h3 { text-align:center; font-size:1.12rem; margin:1.6em 0 .7em; }
 article img { display:block; margin:8px auto 22px; border-radius:4px; }
 article .hl { background:var(--mark); }
+.warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 <div class="wrap">
 <header><h1><span>경제콩</span> 발행함 · __DATE__</h1>
 <p>본문 전체 복사 → 네이버 글쓰기 본문에 붙여넣기. 제목·태그는 버튼으로 따로 복사해서 넣으면 돼. 첫 사진이 썸네일이야.</p></header>
+__WARN__
 <nav id="nav"></nav>
 __SECTIONS__
 </div>
