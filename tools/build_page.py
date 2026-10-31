@@ -6,6 +6,7 @@ posts.json:
  "posts":[{"type":"딥|기초|이슈","title":"...","tags":"#태그1 #태그2 ...",
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
+post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -49,6 +50,10 @@ def build(spec):
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"]),
                         "gpt": p.get("gpt_prompt", "")})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
+        if p.get("keyword"):
+            subs = " · ".join(html.escape(k) for k in p.get("sub_keywords", []))
+            cat += f'<p class="cat">메인 키워드: <b>{html.escape(p["keyword"])}</b>' + (f' <span class="subk">/ 서브: {subs}</span>' if subs else "") + '</p>'
+
         gpt = ""
         if p.get("gpt_prompt"):
             gpt = f'''<details class="gpt"><summary>사진 배경 바꾸고 싶을 때 (GPT 프롬프트)</summary>
@@ -108,7 +113,7 @@ article h3 { text-align:center; font-size:1.12rem; margin:1.6em 0 .7em; }
 article img { display:block; margin:8px auto 22px; border-radius:4px; }
 article .hl { background:var(--mark); } article .hl-g { background:var(--mark-g); } article .hl-b { background:var(--mark-b); } article .hl-p { background:var(--mark-p); }
 article .red { color:var(--red); } article .blue { color:var(--blue); }
-.cat { margin:0; font-size:.92rem; } .cat b { color:var(--bean); }
+.cat { margin:0; font-size:.92rem; } .cat b { color:var(--bean); } .subk { color:var(--muted); }
 .warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
