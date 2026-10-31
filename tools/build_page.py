@@ -22,6 +22,7 @@ STYLES = {"hl": "background-color:#fff59d", "hl-g": "background-color:#d9f7be", 
           "hl-p": "background-color:#ffd6e7", "red": "color:#e03131", "blue": "color:#1c6dd0"}
 
 def to_naver(body, sha):
+    body = re.sub(r"<img[^>]*>", "", body, count=1)  # 썸네일은 '썸네일 복사' 버튼으로 따로 붙여넣음(대표 사진 지정용)
     if not sha:  # 업로드 실패 시: 복사본에서 이미지 제외(미리보기에서 우클릭 복사)
         body = re.sub(r"<img[^>]*>", "", body)
     b = re.sub(r"<img[^>]*src=['\"]([^'\"]+)['\"][^>]*>",
@@ -56,7 +57,8 @@ def build(spec):
 <div class="head"><span class="type t{html.escape(p["type"])}">{html.escape(p["type"])}</span>
 <h2>{html.escape(p["title"])}</h2></div>
 <div class="actions">
-<button type="button" data-act="body" data-i="{i}">본문 전체 복사</button>
+<button type="button" data-act="thumb" data-i="{i}">① 썸네일 복사</button>
+<button type="button" data-act="body" data-i="{i}">② 본문 복사</button>
 <button type="button" class="ghost" data-act="title" data-i="{i}">제목 복사</button>
 <button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button>
 <span class="status" id="s{i}" role="status"></span></div>
@@ -113,7 +115,7 @@ hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 </style>
 <div class="wrap">
 <header><h1><span>경제콩</span> 발행함 · __DATE__</h1>
-<p>본문 전체 복사 → 네이버 글쓰기 본문에 붙여넣기. 제목·태그는 버튼으로 따로 복사해서 넣으면 돼. 첫 사진이 썸네일이야.</p></header>
+<p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목·태그는 버튼으로 따로.</p></header>
 __WARN__
 <nav id="nav"></nav>
 __SECTIONS__
@@ -143,6 +145,19 @@ async function copyHtml(i) {
     else { box.style.cssText = 'position:static'; document.getElementById('p' + i).appendChild(box); say(i, '선택해뒀어. Ctrl+C 눌러줘.'); }
   }
 }
+async function copyThumb(i) {
+  const img = document.querySelector('#a' + i + ' img');
+  if (!img) { say(i, '썸네일이 없어.'); return; }
+  try {
+    if (!window.ClipboardItem) throw 0;
+    const blob = new Promise((res, rej) => {
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0); c.toBlob(b => b ? res(b) : rej(0), 'image/png');
+    });
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    say(i, '썸네일 복사됨. 네이버 본문 맨 위에 붙여넣어 줘.');
+  } catch (e) { say(i, '복사가 막혔어. 아래 첫 사진을 우클릭 → 이미지 복사로 해줘.'); }
+}
 async function copyText(i, t, label) {
   try { await navigator.clipboard.writeText(t); say(i, label + ' 복사됨.'); }
   catch (e) { say(i, '복사가 막혔어. 직접 드래그해서 복사해줘.'); }
@@ -151,6 +166,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const i = +b.dataset.i, act = b.dataset.act;
   if (act === 'body') copyHtml(i);
+  if (act === 'thumb') copyThumb(i);
   if (act === 'title') copyText(i, DATA[i].title, '제목');
   if (act === 'tags') copyText(i, DATA[i].tags, '태그');
   if (act === 'gpt') copyText(i, DATA[i].gpt, '프롬프트');
