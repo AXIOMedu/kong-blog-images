@@ -11,7 +11,7 @@ body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span(class) 만 �
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
   글자색: red(핵심 숫자·리스크) / blue(제품명·회사명·용어 첫 등장)
 - 미리보기: 이미지를 data URI로 박아 넣음 (아티팩트는 외부 이미지를 못 띄움)
-- 복사용: 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
+- 복사용: 소제목·'한 줄 정리' 앞에 빈 줄 자동 삽입. 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
 """
 import base64, html, json, re, sys, os
 
@@ -29,7 +29,9 @@ def to_naver(body, sha):
     for cls, style in STYLES.items():
         b = re.sub(rf"<span class=['\"]{cls}['\"]>", f'<span style="{style}">', b)
     b = re.sub(r"<p>", '<p style="text-align:center">', b)
-    b = re.sub(r"<h3>(.*?)</h3>", r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
+    BLANK = '<p style="text-align:center"><br></p>'
+    b = re.sub(r"<p style=\"text-align:center\"><b>한 줄 정리</b></p>", BLANK + r'<p style="text-align:center"><b>한 줄 정리</b></p>', b)
+    b = re.sub(r"<h3>(.*?)</h3>", BLANK + r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
     return b
 
 def to_preview(body):
