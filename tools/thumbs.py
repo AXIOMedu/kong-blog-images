@@ -1,5 +1,8 @@
 """경제콩 썸네일 생성기 (1080x1080 JPG)
 
+주의: 썸네일은 프롤로그 그리드(약 350px)로 줄어들어 보인다. 문구는 짧게.
+  A: kicker 15자 이내, big은 숫자 위주 6자 이내, line2 10자 이내, chart labels는 각 2~3글자(길면 줄여서). foot은 더 이상 표시하지 않음(출처는 본문 차트에).
+
 사용: python3 tools/thumbs.py spec.json
 spec.json 예시
   A 실적 카드형(딥):  {"style":"A","out":"2026-11-01/deep_thumb.jpg","kicker":"일라이 릴리 3분기 실적",
@@ -30,8 +33,8 @@ def bars(labels, values, w, h, color):
     cols = ["#c9ced6"] * (len(values) - 1) + [color]
     ax.bar(labels, values, color=cols, width=0.62)
     for s in ax.spines.values(): s.set_visible(False)
-    ax.tick_params(colors="#6b7280", labelsize=16, length=0); ax.set_yticks([])
-    for l in ax.get_xticklabels(): l.set_fontproperties(matplotlib.font_manager.FontProperties(fname=f"{FD}NotoSansCJK-Bold.ttc", size=16))
+    ax.tick_params(colors="#374151", labelsize=30, length=0); ax.set_yticks([])
+    for l in ax.get_xticklabels(): l.set_fontproperties(matplotlib.font_manager.FontProperties(fname=f"{FD}NotoSansCJK-Bold.ttc", size=30))
     fig.tight_layout(pad=0.4); buf = io.BytesIO(); fig.savefig(buf, format="png"); plt.close(fig)
     return Image.open(buf).convert("RGB")
 
@@ -49,17 +52,16 @@ def mark(d, dark=True, y=H - 56):
     d.text((W - 150, y), "경제콩", font=font(34), fill=(120, 230, 90) if dark else (46, 160, 40))
 
 def style_a(s):
+    # 그리드(약 350px)로 줄어도 읽히게: 큰 글씨 3덩어리 + 굵은 막대만. 출처는 본문에.
     c = rgb(s.get("color", "#d52b1e"))
     img = Image.new("RGB", (W, H), (255, 255, 255)); d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W, 14], fill=c)
-    d.text((60, 70), s["kicker"], font=fit(d, s["kicker"], 52, W - 120, "Bold"), fill=(40, 44, 52))
-    d.text((56, 140), s["big"], font=fit(d, s["big"], 150, W - 120), fill=c)
-    d.text((60, 330), s["line2"], font=fit(d, s["line2"], 92, W - 120), fill=(20, 20, 20))
+    d.rectangle([0, 0, W, 150], fill=c)
+    f = fit(d, s["kicker"], 72, W - 100); d.text(((W - d.textlength(s["kicker"], font=f)) / 2, 30), s["kicker"], font=f, fill=(255, 255, 255))
+    f = fit(d, s["big"], 260, W - 100); d.text(((W - d.textlength(s["big"], font=f)) / 2, 165), s["big"], font=f, fill=c)
+    f = fit(d, s["line2"], 104, W - 100); d.text(((W - d.textlength(s["line2"], font=f)) / 2, 470), s["line2"], font=f, fill=(20, 20, 20))
     ch = s.get("chart")
-    if ch: img.paste(bars(ch["labels"], ch["values"], 960, 520, s.get("color", "#d52b1e")), (60, 480))
-    d.rectangle([0, H - 64, W, H], fill=(24, 28, 36))
-    if s.get("foot"): d.text((60, H - 52), s["foot"], font=fit(d, s["foot"], 30, W - 260, "Bold"), fill=(220, 225, 232))
-    mark(d); return img
+    if ch: img.paste(bars(ch["labels"], ch["values"], 960, 380, s.get("color", "#d52b1e")), (60, 610))
+    mark(d, dark=False); return img
 
 def style_b(s):
     vals = (s.get("chart") or {}).get("values")
