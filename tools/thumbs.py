@@ -11,6 +11,7 @@ spec.json 예시
                      "foot":"연간 매출, 십억 달러 · 2026.10.31 기준"}
   B 형광 박스형(이슈): {"style":"B","out":"...","tag":"오늘의 이슈","l1":"임상 3상 발표 D-7",
                      "l2":"주가는 왜 먼저 빠질까?","sub":"한 줄 부제","chart":{"values":[...]}}  (chart 생략 가능)
+  공통(선택) "logo": "2026-11-02/us_logo.png" — photos.py --logo로 받은 퍼블릭 도메인 로고만. 흰 상자에 원본 그대로 얹음.
   C 텍스트 카드(기초): {"style":"C","out":"...","series":"주식공부 #1","l1":"PER이 낮으면","l2":"정말 싼 걸까?",
                      "sub":"제약사 예시로 3분 만에 이해하기","color":"#1f6feb"}
 """
@@ -48,6 +49,18 @@ def dark_line(values, w, h, color="#ff4d4f"):
     fig.tight_layout(pad=0); buf = io.BytesIO(); fig.savefig(buf, format="png", facecolor="#0d1117"); plt.close(fig)
     return Image.open(buf).convert("RGB").resize((w, h))
 
+def put_logo(img, path, box):
+    # box=(x0,y0,x1,y1) 안에 비율 유지로 맞추고 흰 둥근 상자 위에 원본 그대로 얹는다(변형·재채색 없음)
+    if not path: return
+    try: lg = Image.open(path).convert("RGBA")
+    except Exception: return
+    x0, y0, x1, y1 = box; pad = 14
+    lg.thumbnail((x1 - x0 - 2 * pad, y1 - y0 - 2 * pad))
+    w, h = lg.size[0] + 2 * pad, lg.size[1] + 2 * pad
+    d = ImageDraw.Draw(img); d.rounded_rectangle([x0, y0, x0 + w, y0 + h], 14, fill=(255, 255, 255))
+    img.paste(lg, (x0 + pad, y0 + pad), lg)
+    return x0 + w
+
 def mark(d, dark=True, y=H - 56):
     d.text((W - 150, y), "경제콩", font=font(34), fill=(120, 230, 90) if dark else (46, 160, 40))
 
@@ -56,7 +69,11 @@ def style_a(s):
     c = rgb(s.get("color", "#d52b1e"))
     img = Image.new("RGB", (W, H), (255, 255, 255)); d = ImageDraw.Draw(img)
     d.rectangle([0, 0, W, 150], fill=c)
-    f = fit(d, s["kicker"], 72, W - 100); d.text(((W - d.textlength(s["kicker"], font=f)) / 2, 30), s["kicker"], font=f, fill=(255, 255, 255))
+    right = put_logo(img, s.get("logo"), (36, 22, 330, 128)) if s.get("logo") else None
+    if right:  # 로고가 있으면 kicker는 로고 오른쪽에 왼쪽 정렬
+        f = fit(d, s["kicker"], 64, W - right - 60); d.text((right + 30, 38), s["kicker"], font=f, fill=(255, 255, 255))
+    else:
+        f = fit(d, s["kicker"], 72, W - 100); d.text(((W - d.textlength(s["kicker"], font=f)) / 2, 30), s["kicker"], font=f, fill=(255, 255, 255))
     f = fit(d, s["big"], 260, W - 100); d.text(((W - d.textlength(s["big"], font=f)) / 2, 165), s["big"], font=f, fill=c)
     f = fit(d, s["line2"], 104, W - 100); d.text(((W - d.textlength(s["line2"], font=f)) / 2, 470), s["line2"], font=f, fill=(20, 20, 20))
     ch = s.get("chart")
@@ -77,6 +94,7 @@ def style_b(s):
         f = fit(d, t, 104, W - 160); tw = d.textlength(t, font=f); y = 390 + i * 150
         d.rectangle([60, y, 60 + tw + 40, y + 132], fill=bg); d.text((80, y + 6), t, font=f, fill=col)
     if s.get("sub"): d.text((64, 710), s["sub"], font=fit(d, s["sub"], 48, W - 140, "Bold"), fill=(235, 238, 242))
+    if s.get("logo"): put_logo(img, s["logo"], (60, 160, 380, 270))
     mark(d); return img.convert("RGB")
 
 def style_c(s):
@@ -94,6 +112,7 @@ def style_c(s):
     if s.get("sub"):
         f = fit(d, s["sub"], 50, W - 200, "Bold"); tw = d.textlength(s["sub"], font=f)
         d.text(((W - tw) / 2, 760), s["sub"], font=f, fill=(70, 75, 85))
+    if s.get("logo"): put_logo(img, s["logo"], (80, 880, 400, 990))
     mark(d, dark=False, y=H - 130); return img
 
 if __name__ == "__main__":

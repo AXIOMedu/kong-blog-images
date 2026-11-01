@@ -8,7 +8,7 @@ posts.json:
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
 post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
-body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span(class) 만 사용.
+body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
   글자색: red(핵심 숫자·리스크) / blue(제품명·회사명·용어 첫 등장)
 - 미리보기: 이미지를 data URI로 박아 넣음 (아티팩트는 외부 이미지를 못 띄움)
@@ -28,10 +28,11 @@ def tag_line(tags):
 
 def to_naver(body, sha, tags=""):
     body = re.sub(r"<img[^>]*>", "", body, count=1)  # 썸네일은 '썸네일 복사' 버튼으로 따로 붙여넣음(대표 사진 지정용)
-    if not sha:  # 업로드 실패 시: 복사본에서 이미지 제외(미리보기에서 우클릭 복사)
-        body = re.sub(r"<img[^>]*>", "", body)
+    if not sha:  # 업로드 실패 시: 저장소 이미지만 제외(외부 사진 주소는 유지)
+        body = re.sub(r"<img(?![^>]*src=['\"]http)[^>]*>", "", body)
+    def src(u): return u if u.startswith("http") else f"https://raw.githubusercontent.com/{REPO}/{sha}/{u}"  # http로 시작하면 외부 사진 주소 그대로
     b = re.sub(r"<img[^>]*src=['\"]([^'\"]+)['\"][^>]*>",
-               lambda m: f'<p style="text-align:center"><img src="https://raw.githubusercontent.com/{REPO}/{sha}/{m.group(1)}" style="max-width:100%"></p>', body)
+               lambda m: f'<p style="text-align:center"><img src="{src(m.group(1))}" style="max-width:100%"></p>', body)
     for cls, style in STYLES.items():
         b = re.sub(rf"<span class=['\"]{cls}['\"]>", f'<span style="{style}">', b)
     b = re.sub(r"<p>", '<p style="text-align:center">', b)
@@ -44,6 +45,8 @@ def to_naver(body, sha, tags=""):
 
 def to_preview(body):
     def emb(m):
+        if m.group(1).startswith("http"):  # 아티팩트는 외부 이미지를 못 띄움 → 자리 표시
+            return '<div style="background:#ddd;color:#555;padding:40px 10px;text-align:center;border-radius:8px">실사진 (네이버에 붙여넣으면 들어감)</div>'
         p = os.path.join(ROOT, m.group(1))
         mime = "image/png" if p.endswith(".png") else "image/jpeg"
         data = base64.b64encode(open(p, "rb").read()).decode()
