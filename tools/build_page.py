@@ -12,7 +12,7 @@ body 규칙: p, h3, b, br, a, img(src=저장소 상대경로), span(class) 만 �
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
   글자색: red(핵심 숫자·리스크) / blue(제품명·회사명·용어 첫 등장)
 - 미리보기: 이미지를 data URI로 박아 넣음 (아티팩트는 외부 이미지를 못 띄움)
-- 복사용: 소제목·'한 줄 정리' 앞에 빈 줄 자동 삽입. 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
+- 복사용: 소제목·'한 줄 정리' 앞에 빈 줄 자동 삽입. 본문 맨 끝에 '#태그 #태그' 줄 자동 추가(띄어쓰기 제거). 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
 """
 import base64, html, json, re, sys, os
 
@@ -22,7 +22,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STYLES = {"hl": "background-color:#fff59d", "hl-g": "background-color:#d9f7be", "hl-b": "background-color:#cfe8ff",
           "hl-p": "background-color:#ffd6e7", "red": "color:#e03131", "blue": "color:#1c6dd0"}
 
-def to_naver(body, sha):
+def tag_line(tags):
+    ts = [t.replace(" ", "") for t in re.split(r"[#,\s]*#", " " + tags) if t.strip()]
+    return " ".join("#" + t.strip("#,") for t in ts if t.strip("#,"))
+
+def to_naver(body, sha, tags=""):
     body = re.sub(r"<img[^>]*>", "", body, count=1)  # 썸네일은 '썸네일 복사' 버튼으로 따로 붙여넣음(대표 사진 지정용)
     if not sha:  # 업로드 실패 시: 복사본에서 이미지 제외(미리보기에서 우클릭 복사)
         body = re.sub(r"<img[^>]*>", "", body)
@@ -34,6 +38,8 @@ def to_naver(body, sha):
     BLANK = '<p style="text-align:center"><br></p>'
     b = re.sub(r"<p style=\"text-align:center\"><b>한 줄 정리</b></p>", BLANK + r'<p style="text-align:center"><b>한 줄 정리</b></p>', b)
     b = re.sub(r"<h3>(.*?)</h3>", BLANK + r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
+    if tags.strip():  # 본문 맨 끝 해시태그 줄: 네이버가 본문 #태그를 태그로 자동 등록하는지 사용자 테스트용
+        b += BLANK + f'<p style="text-align:center">{html.escape(tag_line(tags))}</p>'
     return b
 
 def to_preview(body):
@@ -47,7 +53,7 @@ def to_preview(body):
 def build(spec):
     secs, payload = [], []
     for i, p in enumerate(spec["posts"]):
-        payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"]),
+        payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
                         "gpt": p.get("gpt_prompt", "")})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
         if p.get("keyword"):
@@ -120,7 +126,7 @@ hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 </style>
 <div class="wrap">
 <header><h1><span>경제콩</span> 발행함 · __DATE__</h1>
-<p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목·태그는 버튼으로 따로.</p></header>
+<p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목은 버튼으로 따로. 태그는 본문 맨 끝 #태그 줄로 같이 들어감(발행 창에 자동으로 안 잡히면 태그 복사 버튼).</p></header>
 __WARN__
 <nav id="nav"></nav>
 __SECTIONS__
