@@ -20,6 +20,10 @@ spec.json 예시
                      사진이 없고 PD 로고만 있으면 "photo" 대신 "logo":"...png","bg":"#1f4e8c" → 색 배경에 로고를 크게(인텔 로고 타일처럼).
                      head 6~11자(숫자 하나 넣기), sub 16자 이내(선택), tag 6자 이내(선택).
                      CC BY·CC BY-SA 사진이면 본문 첫 줄(썸네일 바로 아래)에 credit 캡션 필수.
+  M 메모 캡처형(커뮤니티): {"style":"M","out":"...","title":"위고비 끊으면 요요 온다는데","lines":["68주에 659만원 썼는데","끊고 1년 뒤 남은 건 5.6kg?"],
+                     "hl":"5.6kg","time":"6:36","date":"2026년 11월 3일 오전 6:36"}
+                     휴대폰 메모 앱을 캡처한 듯한 화면. 폴더 이름 자리에 mark(경제콩)가 들어감. title 16자 안팎(굵게, 길면 두 줄),
+                     lines 2~4줄(각 18자 안팎, 말하듯 1인칭), hl은 lines 안의 강조할 글자(노란 형광, 선택). time·date 생략 시 지금 시각.
   C 텍스트 카드(기초): {"style":"C","out":"...","series":"주식공부 #1","l1":"PER이 낮으면","l2":"정말 싼 걸까?",
                      "sub":"제약사 예시로 3분 만에 이해하기","color":"#1f6feb"}
 """
@@ -150,9 +154,61 @@ def style_p(s):
     if s.get("sub"): d.text((62, y + 140), s["sub"], font=fit(d, s["sub"], 50, W - 300, "Bold"), fill=(235, 238, 242))
     mark(d, y=y + 150); return img.convert("RGB")
 
+def wrap(d, t, f, maxw):
+    out, cur = [], ""
+    for ch in t:
+        if d.textlength(cur + ch, font=f) > maxw and cur:
+            cut = cur.rfind(" ")
+            if cut > 0: out.append(cur[:cut]); cur = cur[cut + 1:] + ch
+            else: out.append(cur); cur = ch
+        else: cur += ch
+    if cur: out.append(cur)
+    return out
+
+def style_m(s):
+    # 휴대폰 메모 앱 캡처 느낌: 상태바·폴더 이름은 위(홈판에서 잘려도 됨), 날짜·제목·본문은 안전영역(236~844) 안
+    import datetime
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    ampm = "오전" if now.hour < 12 else "오후"; h12 = now.hour % 12 or 12
+    tm = s.get("time", f"{h12}:{now.minute:02d}")
+    date = s.get("date", f"{now.year}년 {now.month}월 {now.day}일 {ampm} {h12}:{now.minute:02d}")
+    Y = (224, 167, 0); INK = (17, 17, 17); GRAY = (142, 142, 147)
+    img = Image.new("RGB", (W, H), (255, 255, 255)); d = ImageDraw.Draw(img)
+    # 상태바
+    d.text((84, 38), tm, font=font(46, "Bold"), fill=INK)
+    for i in range(4):
+        bh = 12 + i * 8; d.rounded_rectangle([800 + i * 18, 82 - bh, 812 + i * 18, 82], 3, fill=INK)
+    d.rounded_rectangle([890, 50, 976, 86], 10, outline=(150, 150, 150), width=3)
+    d.rounded_rectangle([896, 56, 950, 80], 6, fill=INK); d.rounded_rectangle([979, 61, 985, 75], 2, fill=(150, 150, 150))
+    # 폴더 이름(뒤로가기)
+    d.line([70, 142, 50, 164, 70, 186], fill=Y, width=6, joint="curve")
+    d.text((88, 134), MARK, font=font(46, "Regular"), fill=Y)
+    for cx in (900, 1000):
+        d.ellipse([cx - 34, 128, cx + 34, 196], outline=Y, width=4)
+    for dx in (-16, 0, 16): d.ellipse([1000 + dx - 4, 158, 1000 + dx + 4, 166], fill=Y)
+    d.line([886, 150, 900, 136, 914, 150], fill=Y, width=4); d.line([900, 138, 900, 178], fill=Y, width=4)
+    # 날짜
+    f = font(34, "Regular"); d.text(((W - d.textlength(date, font=f)) / 2, 252), date, font=f, fill=GRAY)
+    x0, maxw = 64, W - 128
+    y = 318
+    ft = font(78, "Bold")
+    if d.textlength(s["title"], font=ft) > maxw * 2: ft = fit(d, s["title"], 78, maxw * 2, "Bold")
+    for ln in wrap(d, s["title"], ft, maxw)[:2]:
+        d.text((x0, y), ln, font=ft, fill=INK); y += int(ft.size * 1.3)
+    y += 26
+    fb = font(54, "Regular"); hl = s.get("hl", "")
+    for t in s.get("lines", []):
+        for ln in wrap(d, t, fb, maxw):
+            if y > 860: break
+            if hl and hl in ln:
+                a = d.textlength(ln[:ln.index(hl)], font=fb); b = a + d.textlength(hl, font=fb)
+                d.rectangle([x0 + a - 4, y + 26, x0 + b + 4, y + 70], fill=(255, 236, 120))
+            d.text((x0, y), ln, font=fb, fill=INK); y += 82
+    return img
+
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1]))
     for s in (spec if isinstance(spec, list) else [spec]):
         MARK = s.get("mark", "경제콩")
-        img = {"A": style_a, "B": style_b, "C": style_c, "P": style_p}[s["style"]](s)
+        img = {"A": style_a, "B": style_b, "C": style_c, "P": style_p, "M": style_m}[s["style"]](s)
         img.convert("RGB").save(s["out"], quality=88); print(s["out"])
