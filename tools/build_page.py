@@ -7,6 +7,7 @@ posts.json:
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
 post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
+post에 "slot":"아침|저녁" 을 넣으면 추천 발행 시간(아침 7~9시 / 저녁 6~9시) 배지 표시. 없으면 앞 절반 아침, 뒤 절반 저녁.
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -55,7 +56,10 @@ def to_preview(body):
 
 def build(spec):
     secs, payload = [], []
+    n = len(spec["posts"])
     for i, p in enumerate(spec["posts"]):
+        slot = p.get("slot") or ("아침" if i < (n + 1) // 2 else "저녁")
+        when = {"아침": "아침 7~9시", "저녁": "저녁 6~9시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
                         "gpt": p.get("gpt_prompt", "")})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
@@ -69,7 +73,7 @@ def build(spec):
 <p>{html.escape(p["gpt_prompt"])}</p><button type="button" class="ghost" data-act="gpt" data-i="{i}">프롬프트 복사</button></details>'''
         secs.append(f'''<section class="post" id="p{i}">
 <div class="head"><span class="type t{html.escape(p["type"])}">{html.escape(p["type"])}</span>
-<h2>{html.escape(p["title"])}</h2></div>
+<h2>{html.escape(p["title"])}</h2><span class="slot s{html.escape(slot)}">추천 발행 {html.escape(when)}</span></div>
 <div class="actions">
 <button type="button" data-act="thumb" data-i="{i}">① 썸네일 복사</button>
 <button type="button" data-act="body" data-i="{i}">② 본문 복사</button>
@@ -106,6 +110,8 @@ nav a { color:var(--ink); text-decoration:none; border:1px solid var(--line); ba
 .head { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
 .head h2 { margin:0; font-size:1.2rem; line-height:1.45; text-wrap:balance; flex:1 1 280px; min-width:0; }
 .type { font-weight:700; font-size:.8rem; letter-spacing:.04em; padding:3px 10px; border-radius:6px; color:#fff; }
+.slot { font-size:.8rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--paper); }
+.s아침 { color:var(--issue); border-color:var(--issue); } .s저녁 { color:var(--basic); border-color:var(--basic); }
 .t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { font:700 .92rem var(--body); background:var(--bean); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; }
@@ -129,7 +135,7 @@ hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 </style>
 <div class="wrap">
 <header><h1><span>경제콩</span> 발행함 · __DATE__</h1>
-<p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목은 버튼으로 따로. 태그는 본문 맨 끝 #태그 줄로 같이 들어감(발행 창에 자동으로 안 잡히면 태그 복사 버튼).</p></header>
+<p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목은 버튼으로 따로. 태그는 본문 맨 끝 #태그 줄로 같이 들어감(발행 창에 자동으로 안 잡히면 태그 복사 버튼). 글마다 붙은 추천 발행 시간(아침 7~9시 / 저녁 6~9시)에 맞춰 나눠 올리면 홈판에 유리해. 올린 뒤 1시간 안에 달린 댓글엔 바로 답글.</p></header>
 __WARN__
 <nav id="nav"></nav>
 __SECTIONS__
@@ -138,7 +144,7 @@ __SECTIONS__
 const DATA = __PAYLOAD__;
 const nav = document.getElementById('nav');
 document.querySelectorAll('.post').forEach((s, i) => {
-  const a = document.createElement('a'); a.href = '#p' + i; a.textContent = s.querySelector('.type').textContent + ' · ' + DATA[i].title.slice(0, 18);
+  const a = document.createElement('a'); a.href = '#p' + i; a.textContent = s.querySelector('.type').textContent + ' · ' + (s.querySelector('.slot').textContent.includes('아침') ? '☀ ' : '☾ ') + DATA[i].title.slice(0, 18);
   nav.appendChild(a);
 });
 function say(i, t) { const el = document.getElementById('s' + i); el.textContent = t; }
