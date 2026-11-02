@@ -2,7 +2,7 @@
 
 사용: python3 tools/build_page.py posts.json out.html
 posts.json:
-{"date":"2026-11-01","sha":"<이미지가 들어간 커밋 SHA>",
+{"brand":"경제콩|멘토콩"(선택, 기본 경제콩), "date":"2026-11-01","sha":"<이미지가 들어간 커밋 SHA>",
  "posts":[{"type":"딥|기초|이슈|미국주식|커뮤니티|칼럼","title":"...","tags":"#태그1 #태그2 ...",
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
@@ -58,7 +58,7 @@ def build(spec):
     secs, payload = [], []
     n = len(spec["posts"])
     for i, p in enumerate(spec["posts"]):
-        slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티") else "저녁")
+        slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티", "뉴스", "시기") else "저녁")
         when = {"아침": "아침 7~9시", "저녁": "저녁 6~9시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
                         "gpt": p.get("gpt_prompt", "")})
@@ -83,12 +83,12 @@ def build(spec):
 {cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
-        secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 7편이 여기 채워져.</p></article></section>')
+        secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 글이 여기 채워져.</p></article></section>')
     warn = "" if spec.get("sha") else '<p class="warn">오늘은 이미지 업로드가 실패했어. 본문 복사엔 사진이 빠져 있으니, 미리보기 사진을 우클릭 → 이미지 복사로 넣어줘.</p>'
-    return TEMPLATE.replace("__WARN__", warn).replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
+    return TEMPLATE.replace("__BRAND__", html.escape(spec.get("brand", "경제콩"))).replace("__WARN__", warn).replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
                    .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False).replace("</", "<\\/"))
 
-TEMPLATE = r"""<title>경제콩 발행함</title>
+TEMPLATE = r"""<title>__BRAND__ 발행함</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
@@ -112,7 +112,7 @@ nav a { color:var(--ink); text-decoration:none; border:1px solid var(--line); ba
 .type { font-weight:700; font-size:.8rem; letter-spacing:.04em; padding:3px 10px; border-radius:6px; color:#fff; }
 .slot { font-size:.8rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--paper); }
 .s아침 { color:var(--issue); border-color:var(--issue); } .s저녁 { color:var(--basic); border-color:var(--basic); }
-.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; }
+.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t뉴스 { background:var(--issue); } .t탐구 { background:var(--basic); } .t시기 { background:#2e7d32; } .t의대 { background:var(--deep); } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { font:700 .92rem var(--body); background:var(--bean); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; }
 button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
@@ -134,7 +134,7 @@ hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 <div class="wrap">
-<header><h1><span>경제콩</span> 발행함 · __DATE__</h1>
+<header><h1><span>__BRAND__</span> 발행함 · __DATE__</h1>
 <p>① 썸네일 복사 → 네이버 본문 맨 위에 붙여넣기(사진으로 업로드돼서 대표 사진이 됨) → ② 본문 복사 → 그 아래 붙여넣기. 제목은 버튼으로 따로. 태그는 본문 맨 끝 #태그 줄로 같이 들어감(발행 창에 자동으로 안 잡히면 태그 복사 버튼). 글마다 붙은 추천 발행 시간(아침 7~9시 / 저녁 6~9시)에 맞춰 나눠 올리면 홈판에 유리해. 올린 뒤 1시간 안에 달린 댓글엔 바로 답글.</p></header>
 __WARN__
 <nav id="nav"></nav>

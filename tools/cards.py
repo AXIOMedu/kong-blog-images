@@ -3,7 +3,7 @@ AI 사진 대신 쓰는 '사람이 만든 티 나는' 정보 이미지: 표, 요
 숫자·사실은 반드시 출처에서 확인한 값만. 의사 지칭은 짧은 문구 규칙(일반의/전공의)을 따른다.
 
 사용: python3 tools/cards.py spec.json   (spec은 객체 하나 또는 배열, 저장소 루트에서 실행)
-공통 키: out, type, title(결론형 한 줄, 25자 이내), sub(선택), source(선택, "출처: ..." → "자료: ..."로 표시)
+공통 키: mark(선택, 기본 "경제콩"), out, type, title(결론형 한 줄, 25자 이내), sub(선택), source(선택, "출처: ..." → "자료: ..."로 표시)
 type별 키
   summary   : points ["한 줄", "한 줄", "한 줄"]          (오늘 결론 3줄 카드. 2~4개)
   table     : columns ["구분","2025","2026"], rows [["매출","1,000","1,200"],...], highlight_row 1(선택, 0부터)
@@ -114,7 +114,7 @@ def page(s):
     sub = f"<div class='sub'>{E(s['sub'])}</div>" if s.get("sub") else ""
     return (f"<!doctype html><meta charset='utf-8'><style>{CSS}</style><div class='wrap'><div class='rule'></div>"
             f"<h1>{E(s['title'])}</h1>{sub}<div class='body'>{body(s)}</div>"
-            f"<div class='foot'><span class='src'>{E(src)}</span><span class='mark'>경제콩</span></div></div>")
+            f"<div class='foot'><span class='src'>{E(src)}</span><span class='mark'>{E(s.get("mark", "경제콩"))}</span></div></div>")
 
 def render(specs):
     with sync_playwright() as p:

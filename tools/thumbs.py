@@ -1,5 +1,6 @@
 """경제콩 썸네일 생성기 (1080x1080 JPG)
 
+공통(선택) "mark": 오른쪽 아래 블로그 표시(기본 "경제콩", 멘토콩 블로그는 "멘토콩").
 주의: 썸네일은 프롤로그 그리드(약 350px)로 줄어들어 보인다. 문구는 짧게.
 홈판(홈피드)·메인 경제판은 약 16:9로 가운데만 잘라 보여준다 → 글자·핵심은 전부 세로 236~844px 안전영역 안에 둔다(모든 스타일 적용됨).
 기본은 P(실사진+짧은 글자띠). 실사진(또는 PD 로고)을 못 구했을 때만 A/B/C 카드형.
@@ -68,8 +69,9 @@ def put_logo(img, path, box):
     img.paste(lg, (x0 + pad, y0 + pad), lg)
     return x0 + w
 
+MARK = "경제콩"  # spec의 "mark"로 바꿈(예: "멘토콩")
 def mark(d, dark=True, y=H - 56):
-    d.text((W - 150, y), "경제콩", font=font(34), fill=(120, 230, 90) if dark else (46, 160, 40))
+    d.text((W - 150, y), MARK, font=font(34), fill=(120, 230, 90) if dark else (46, 160, 40))
 
 def style_a(s):
     # 그리드(약 350px)로 줄어도 읽히게: 큰 글씨 3덩어리 + 굵은 막대만. 출처는 본문에.
@@ -151,5 +153,6 @@ def style_p(s):
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1]))
     for s in (spec if isinstance(spec, list) else [spec]):
+        MARK = s.get("mark", "경제콩")
         img = {"A": style_a, "B": style_b, "C": style_c, "P": style_p}[s["style"]](s)
         img.convert("RGB").save(s["out"], quality=88); print(s["out"])

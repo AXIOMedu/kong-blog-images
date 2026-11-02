@@ -119,7 +119,7 @@ def draw(s):
     src = s.get("source", "").strip()
     if src.startswith("출처:"): src = "자료:" + src[3:]
     fig.text(0.05, 0.035, src, fontproperties=NG, fontsize=12, color="#666666")
-    fig.text(0.95, 0.035, "경제콩", ha="right", fontproperties=DH, fontsize=17, color=GREEN)
+    fig.text(0.95, 0.035, s.get("mark", "경제콩"), ha="right", fontproperties=DH, fontsize=17, color=GREEN)
     fig.savefig(s["out"], facecolor=BG, pil_kwargs={"quality": 90}); plt.close(fig)
     print(s["out"])
 
