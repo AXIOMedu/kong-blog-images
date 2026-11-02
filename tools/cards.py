@@ -36,7 +36,7 @@ CSS = f"""
 @font-face{{font-family:NG;font-weight:800;src:url('file://{FD}/NanumGothic-ExtraBold.ttf')}}
 @font-face{{font-family:DH;src:url('file://{FD}/DoHyeon-Regular.ttf')}}
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{width:1080px;background:#f6f3ee;font-family:NG,'Noto Sans CJK KR',sans-serif;color:#111}}
+body{{width:1080px;word-break:keep-all;background:#f6f3ee;font-family:NG,'Noto Sans CJK KR',sans-serif;color:#111}}
 .wrap{{padding:54px 60px 40px}}
 .rule{{height:10px;background:#111;margin-bottom:30px}}
 h1{{font-family:DH,sans-serif;font-weight:400;font-size:54px;line-height:1.2;letter-spacing:-0.5px}}
@@ -50,7 +50,8 @@ h1{{font-family:DH,sans-serif;font-weight:400;font-size:54px;line-height:1.2;let
 .pt:last-child{{border-bottom:none}}
 .num{{font-family:DH;font-size:48px;color:#c8102e;width:56px;flex:none;line-height:1}}
 .pt p{{font-size:31px;font-weight:700;line-height:1.45}}
-.pt:first-child p{{background:linear-gradient(transparent 58%,#fff59d 58%);display:inline}}
+.pt p{{word-break:keep-all}}
+.pt:first-child p span{{background:linear-gradient(transparent 58%,#fff59d 58%);-webkit-box-decoration-break:clone;box-decoration-break:clone}}
 /* table */
 table{{width:100%;border-collapse:collapse;font-size:27px}}
 th{{background:#111;color:#fff;font-weight:700;padding:18px 16px;text-align:left}}
@@ -118,7 +119,7 @@ def isnum(s):
 def body(s):
     t = s["type"]
     if t == "summary":
-        return "".join(f"<div class='pt'><div class='num'>{i + 1}</div><p>{E(p)}</p></div>" for i, p in enumerate(s["points"]))
+        return "".join(f"<div class='pt'><div class='num'>{i + 1}</div><p><span>{E(p)}</span></p></div>" for i, p in enumerate(s["points"]))
     if t == "table":
         cols, rows, hi = s["columns"], s["rows"], s.get("highlight_row", -1)
         numc = [all(isnum(r[j]) for r in rows) for j in range(len(cols))]
