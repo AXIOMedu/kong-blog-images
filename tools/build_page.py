@@ -8,6 +8,8 @@ posts.json:
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
 post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
 post에 "slot":"아침|저녁" 을 넣으면 추천 발행 시간(아침 7~9시 / 저녁 6~9시) 배지 표시. 없으면 이슈·딥·커뮤니티는 아침, 나머지(기초·미국주식·칼럼)는 저녁.
+post에 "cardnews_zip":"https://raw.githubusercontent.com/... .zip"(인스타 카드뉴스 묶음), "ig_caption":"인스타 캡션" 을 넣으면
+  발행함에 '카드뉴스 받기' 링크와 '인스타 캡션 복사' 버튼이 생김(학원 인스타 전달용).
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -61,7 +63,7 @@ def build(spec):
         slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티", "뉴스", "시기") else "저녁")
         when = {"아침": "아침 7~9시", "저녁": "저녁 6~9시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
-                        "gpt": p.get("gpt_prompt", "")})
+                        "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", "")})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
         if p.get("keyword"):
             subs = " · ".join(html.escape(k) for k in p.get("sub_keywords", []))
@@ -79,6 +81,8 @@ def build(spec):
 <button type="button" data-act="body" data-i="{i}">② 본문 복사</button>
 <button type="button" class="ghost" data-act="title" data-i="{i}">제목 복사</button>
 <button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button>
+{f'<a class="btn ghost" href="{html.escape(p["cardnews_zip"])}" target="_blank" rel="noopener">카드뉴스 받기(zip)</a>' if p.get("cardnews_zip") else ""}
+{f'<button type="button" class="ghost" data-act="ig" data-i="{i}">인스타 캡션 복사</button>' if p.get("ig_caption") else ""}
 <span class="status" id="s{i}" role="status"></span></div>
 {cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
@@ -115,7 +119,8 @@ nav a { color:var(--ink); text-decoration:none; border:1px solid var(--line); ba
 .t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t뉴스 { background:var(--issue); } .t탐구 { background:var(--basic); } .t시기 { background:#2e7d32; } .t의대 { background:var(--deep); } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { font:700 .92rem var(--body); background:var(--bean); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; }
-button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+button.ghost, a.btn { background:transparent; color:var(--ink); border:1px solid var(--line); }
+a.btn { font:700 .92rem var(--body); border-radius:8px; padding:10px 16px; text-decoration:none; display:inline-block; }
 button:focus-visible { outline:3px solid var(--ink); outline-offset:2px; }
 .status { font-size:.85rem; color:var(--muted); }
 .tags { margin:0; color:var(--muted); font-size:.88rem; line-height:1.6; word-break:keep-all; }
@@ -190,6 +195,7 @@ document.addEventListener('click', e => {
   if (act === 'title') copyText(i, DATA[i].title, '제목');
   if (act === 'tags') copyText(i, DATA[i].tags, '태그');
   if (act === 'gpt') copyText(i, DATA[i].gpt, '프롬프트');
+  if (act === 'ig') copyText(i, DATA[i].ig, '인스타 캡션');
 });
 </script>
 """

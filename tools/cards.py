@@ -3,6 +3,14 @@ AI 사진 대신 쓰는 '사람이 만든 티 나는' 정보 이미지: 표, 요
 숫자·사실은 반드시 출처에서 확인한 값만. 의사 지칭은 짧은 문구 규칙(일반의/전공의)을 따른다.
 
 사용: python3 tools/cards.py spec.json   (spec은 객체 하나 또는 배열, 저장소 루트에서 실행)
+
+카드뉴스 모드(멘토콩·AXIOM용): "frame":"card" → 인스타 4:5 규격 1080x1350 고정, 내용은 세로 가운데 정렬.
+  "brand":"AXIOM" → 오른쪽 아래에 AXIOM 아이콘(흰 바탕 검은 A)+글자 워터마크(이때 mark는 무시).
+  "page":"2/6" → 오른쪽 위에 쪽 번호. 글 하나의 이미지를 순서대로 모으면 그대로 카드뉴스 한 세트가 되게 만든다.
+  type "image": src(로컬 이미지 경로, 예: chart.py로 만든 차트) 한 장을 카드 안에 넣는다. title 생략 가능.
+  type "cover"(표지, frame card 전용): tag(작은 말머리), title(2줄까지, \n으로 줄바꿈), sub(한 줄), color(강조색).
+    제목은 세로 가운데에 둬서 네이버 썸네일(정사각·16:9)로 잘려도 보인다.
+  카드 내용이 많아 1350px를 넘으면 경고가 나온다 → 행·항목을 줄인다.
 공통 키: mark(선택, 기본 "경제콩"), out, type, title(결론형 한 줄, 25자 이내), sub(선택), source(선택, "출처: ..." → "자료: ..."로 표시)
 type별 키
   summary   : points ["한 줄", "한 줄", "한 줄"]          (오늘 결론 3줄 카드. 2~4개)
@@ -13,10 +21,13 @@ type별 키
   timeline  : events [{"date":"2026.9","text":"노바티스와 계약"}, ...], highlight 2(선택)   (3~7개)
   stat      : stats [{"label":"52주 고점 대비","value":"-61%","note":"10/30 종가 기준"}, ...]  (2~4개, 첫 번째가 빨강)
 """
-import html, json, os, sys, tempfile
+import base64, html, json, os, sys, tempfile
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__)); FD = os.path.join(HERE, "fonts")
+ICON = os.path.join(os.path.dirname(HERE), "brand", "axiom_icon_border_1024.png")
+def icon_uri():
+    return "data:image/png;base64," + base64.b64encode(open(ICON, "rb").read()).decode()
 E = lambda s: html.escape(str(s))
 
 CSS = f"""
@@ -74,6 +85,29 @@ td:first-child{{font-weight:700}}
 .st:first-child{{border-top-color:#c8102e}}
 .st .l{{font-size:24px;color:#555;font-weight:700}} .st .v{{font-family:DH;font-size:72px;margin-top:8px;line-height:1.1}}
 .st:first-child .v{{color:#c8102e}} .st .no{{font-size:20px;color:#777;margin-top:6px}}
+/* card frame (instagram 4:5) */
+.card .wrap{{height:1350px;display:flex;flex-direction:column;padding:64px 64px 48px}}
+.card .body{{flex:1;display:flex;flex-direction:column;justify-content:center;margin-top:24px}}
+.card .foot{{margin-top:28px}}
+.card h1{{font-size:68px}} .card .sub{{font-size:28px}}
+.card table{{font-size:34px}} .card th,.card td{{padding:26px 18px}}
+.card .pt{{padding:34px 0}} .card .pt p{{font-size:40px}} .card .num{{font-size:60px;width:70px}}
+.card .step{{padding:30px 32px}} .card .step .lb{{font-size:44px;min-width:250px}} .card .step .ds{{font-size:31px}} .card .arrow{{font-size:40px;padding:12px 0}}
+.card .col h2{{font-size:48px}} .card .col li{{font-size:33px;padding:24px 28px}}
+.card .ev .d{{font-size:36px}} .card .ev .t{{font-size:36px}} .card .ev{{padding:20px 0 28px}}
+.card .st{{padding:34px 30px 30px}} .card .st .l{{font-size:28px}} .card .st .v{{font-size:84px}} .card .st .no{{font-size:24px}}
+.card .src{{font-size:20px}}
+.pg{{position:absolute;top:30px;right:64px;font-family:DH;font-size:30px;color:#999;letter-spacing:2px}}
+.ax{{display:flex;align-items:center;gap:12px;font-family:NG;font-weight:800;font-size:26px;letter-spacing:4px;color:#111}}
+.ax img{{width:52px;height:52px}}
+/* cover */
+.cv{{display:flex;flex-direction:column;align-items:flex-start;gap:30px}}
+.cv .tg{{font-size:34px;font-weight:800;color:#fff;padding:10px 26px;border-radius:999px}}
+.cv h2{{font-family:DH;font-weight:400;font-size:112px;line-height:1.12;letter-spacing:-1px}}
+.cv h2 em{{font-style:normal}}
+.cv .cs{{font-size:36px;color:#444;font-weight:700;line-height:1.4}}
+.cv .bar{{width:120px;height:12px}}
+.swipe{{font-size:24px;color:#888;font-weight:700}}
 """
 
 def isnum(s):
@@ -104,6 +138,15 @@ def body(s):
     if t == "timeline":
         hi = s.get("highlight", -1)
         return "<div class='tl'>" + "".join(f"<div class='ev{' hi' if i == hi else ''}'><div class='d'>{E(e['date'])}</div><div class='t'>{E(e['text'])}</div></div>" for i, e in enumerate(s["events"])) + "</div>"
+    if t == "image":  # 차트 등 이미지 한 장을 카드에 넣기: src(로컬 경로)
+        uri = "data:image/jpeg;base64," + base64.b64encode(open(s["src"], "rb").read()).decode()
+        return f"<img src='{uri}' style='width:100%;display:block'>"
+    if t == "cover":
+        c = s.get("color", "#1f6feb"); lines = E(s["title"]).split("\n")
+        ttl = "<br>".join(f"<em style='color:{c if i == len(lines) - 1 and len(lines) > 1 else '#111'}'>{l}</em>" for i, l in enumerate(lines))
+        tg = f"<div class='tg' style='background:{c}'>{E(s['tag'])}</div>" if s.get("tag") else ""
+        cs = f"<div class='cs'>{E(s['sub'])}</div>" if s.get("sub") else ""
+        return f"<div class='cv'>{tg}<h2>{ttl}</h2><div class='bar' style='background:{c}'></div>{cs}</div>"
     if t == "stat":
         return "<div class='stats'>" + "".join(f"<div class='st'><div class='l'>{E(x['label'])}</div><div class='v'>{E(x['value'])}</div><div class='no'>{E(x.get('note', ''))}</div></div>" for x in s["stats"]) + "</div>"
     raise ValueError(t)
@@ -111,10 +154,18 @@ def body(s):
 def page(s):
     src = s.get("source", "").strip()
     if src.startswith("출처:"): src = "자료:" + src[3:]
+    card = s.get("frame") == "card"
+    mark = (f"<span class='ax'><img src='{icon_uri()}'>AXIOM</span>" if s.get("brand") == "AXIOM"
+            else f"<span class='mark'>{E(s.get('mark', '경제콩'))}</span>")
+    pg = f"<div class='pg'>{E(s['page'])}</div>" if s.get("page") else ""
+    if s["type"] == "cover":
+        left = f"<span class='swipe'>{E(s.get('swipe', '옆으로 넘겨보세요 →'))}</span>"
+        return (f"<!doctype html><meta charset='utf-8'><style>{CSS}</style><body class='card'><div class='wrap' style='position:relative'>{pg}"
+                f"<div class='rule'></div><div class='body'>{body(s)}</div><div class='foot'>{left}{mark}</div></div></body>")
     sub = f"<div class='sub'>{E(s['sub'])}</div>" if s.get("sub") else ""
-    return (f"<!doctype html><meta charset='utf-8'><style>{CSS}</style><div class='wrap'><div class='rule'></div>"
-            f"<h1>{E(s['title'])}</h1>{sub}<div class='body'>{body(s)}</div>"
-            f"<div class='foot'><span class='src'>{E(src)}</span><span class='mark'>{E(s.get("mark", "경제콩"))}</span></div></div>")
+    return (f"<!doctype html><meta charset='utf-8'><style>{CSS}</style><body class='{'card' if card else ''}'><div class='wrap' style='position:relative'>{pg}<div class='rule'></div>"
+            f"{'<h1>' + E(s['title']) + '</h1>' if s.get('title') else ''}{sub}<div class='body'>{body(s)}</div>"
+            f"<div class='foot'><span class='src'>{E(src)}</span>{mark}</div></div></body>")
 
 def render(specs):
     with sync_playwright() as p:
@@ -123,6 +174,13 @@ def render(specs):
             with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as f:
                 f.write(page(s)); path = f.name
             pg.goto("file://" + path); pg.wait_for_timeout(150)
+            if s.get("frame") == "card" or s["type"] == "cover":
+                pg.set_viewport_size({"width": 1080, "height": 1350}); pg.wait_for_timeout(50)
+                over = pg.evaluate("(()=>{const w=document.querySelector('.wrap');return w.scrollHeight>w.clientHeight+2})()")
+                if over: print(f"경고: {s['out']} 내용이 1350px를 넘음 → 행·항목을 줄일 것", file=sys.stderr)
+                os.makedirs(os.path.dirname(os.path.abspath(s["out"])), exist_ok=True)
+                pg.screenshot(path=s["out"], type="jpeg", quality=90, clip={"x": 0, "y": 0, "width": 1080, "height": 1350}); os.unlink(path); print(s["out"]); continue
+            pg.set_viewport_size({"width": 1080, "height": 800})
             h = pg.evaluate("document.querySelector('.wrap').getBoundingClientRect().height")
             pg.set_viewport_size({"width": 1080, "height": int(max(h, 560))})
             os.makedirs(os.path.dirname(os.path.abspath(s["out"])), exist_ok=True)
