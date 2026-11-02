@@ -3,11 +3,11 @@
 사용: python3 tools/build_page.py posts.json out.html
 posts.json:
 {"date":"2026-11-01","sha":"<이미지가 들어간 커밋 SHA>",
- "posts":[{"type":"딥|기초|이슈|미국주식","title":"...","tags":"#태그1 #태그2 ...",
+ "posts":[{"type":"딥|기초|이슈|미국주식|커뮤니티|칼럼","title":"...","tags":"#태그1 #태그2 ...",
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
 post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
-post에 "slot":"아침|저녁" 을 넣으면 추천 발행 시간(아침 7~9시 / 저녁 6~9시) 배지 표시. 없으면 앞 절반 아침, 뒤 절반 저녁.
+post에 "slot":"아침|저녁" 을 넣으면 추천 발행 시간(아침 7~9시 / 저녁 6~9시) 배지 표시. 없으면 이슈·딥·커뮤니티는 아침, 나머지(기초·미국주식·칼럼)는 저녁.
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -58,7 +58,7 @@ def build(spec):
     secs, payload = [], []
     n = len(spec["posts"])
     for i, p in enumerate(spec["posts"]):
-        slot = p.get("slot") or ("아침" if i < (n + 1) // 2 else "저녁")
+        slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티") else "저녁")
         when = {"아침": "아침 7~9시", "저녁": "저녁 6~9시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
                         "gpt": p.get("gpt_prompt", "")})
@@ -83,7 +83,7 @@ def build(spec):
 {cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
-        secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 6편이 여기 채워져.</p></article></section>')
+        secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 7편이 여기 채워져.</p></article></section>')
     warn = "" if spec.get("sha") else '<p class="warn">오늘은 이미지 업로드가 실패했어. 본문 복사엔 사진이 빠져 있으니, 미리보기 사진을 우클릭 → 이미지 복사로 넣어줘.</p>'
     return TEMPLATE.replace("__WARN__", warn).replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
                    .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False).replace("</", "<\\/"))
@@ -112,7 +112,7 @@ nav a { color:var(--ink); text-decoration:none; border:1px solid var(--line); ba
 .type { font-weight:700; font-size:.8rem; letter-spacing:.04em; padding:3px 10px; border-radius:6px; color:#fff; }
 .slot { font-size:.8rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--paper); }
 .s아침 { color:var(--issue); border-color:var(--issue); } .s저녁 { color:var(--basic); border-color:var(--basic); }
-.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; }
+.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { font:700 .92rem var(--body); background:var(--bean); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; }
 button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
