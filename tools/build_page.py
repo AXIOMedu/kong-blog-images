@@ -7,7 +7,7 @@ posts.json:
            "gpt_prompt":"(딥글만, 사진 배경용 GPT 프롬프트)",
            "body":"<img src='2026-11-01/deep_thumb.jpg'><p>...</p><h3>소제목</h3><p><span class='hl'>형광펜</span></p>..."}]}
 post에 "keyword":"메인 키워드", "sub_keywords":["서브1","서브2"] 를 넣으면 발행함에 표시됨.
-post에 "slot":"아침|저녁" 을 넣으면 추천 발행 시간(아침 7~9시 / 저녁 6~9시) 배지 표시. 없으면 이슈·딥·커뮤니티는 아침, 나머지(기초·미국주식·칼럼)는 저녁.
+post에 "slot":"아침|점심|저녁|밤" 을 넣으면 추천 발행 시간(아침 7~9시 / 점심 12~1시 / 저녁 6~9시 / 밤 10~12시) 배지 표시. 하루 10편이면 한꺼번에 올리지 말고 슬롯별로 2~3편씩 나눠 배정. 없으면 이슈·딥·커뮤니티는 아침, 나머지(기초·미국주식·칼럼)는 저녁.
 카드뉴스 추출(학원 인스타 전달용, 사용자가 마음에 드는 글만 골라 추출):
   본문 img 중 경로에 '/cardnews/'가 들어간 것(1080x1350 AXIOM 카드)이 그 글의 카드뉴스 세트가 됨.
   본문 이미지와 다른 세트를 쓰려면 post에 "cards":["저장소 상대경로", ...] 를 직접 넣음.
@@ -67,7 +67,7 @@ def build(spec):
     n = len(spec["posts"])
     for i, p in enumerate(spec["posts"]):
         slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티", "뉴스", "시기") else "저녁")
-        when = {"아침": "아침 7~9시", "저녁": "저녁 6~9시"}.get(slot, slot)
+        when = {"아침": "아침 7~9시", "점심": "점심 12~1시", "저녁": "저녁 6~9시", "밤": "밤 10~12시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
                         "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", ""), "zipname": f'카드뉴스_{spec["date"]}_p{i+1}.zip'})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
@@ -130,8 +130,8 @@ nav a { color:var(--ink); text-decoration:none; border:1px solid var(--line); ba
 .head h2 { margin:0; font-size:1.2rem; line-height:1.45; text-wrap:balance; flex:1 1 280px; min-width:0; }
 .type { font-weight:700; font-size:.8rem; letter-spacing:.04em; padding:3px 10px; border-radius:6px; color:#fff; }
 .slot { font-size:.8rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--paper); }
-.s아침 { color:var(--issue); border-color:var(--issue); } .s저녁 { color:var(--basic); border-color:var(--basic); }
-.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t뉴스 { background:var(--issue); } .t탐구 { background:var(--basic); } .t시기 { background:#2e7d32; } .t의대 { background:var(--deep); } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; }
+.s아침 { color:var(--issue); border-color:var(--issue); } .s점심 { color:#2e7d32; border-color:#2e7d32; } .s저녁 { color:var(--basic); border-color:var(--basic); } .s밤 { color:#7048e8; border-color:#7048e8; }
+.t딥 { background:var(--deep); } .t기초 { background:var(--basic); } .t이슈 { background:var(--issue); } .t미국주식 { background:#1c4e80; } .t뉴스 { background:var(--issue); } .t탐구 { background:var(--basic); } .t시기 { background:#2e7d32; } .t의대 { background:var(--deep); } .t커뮤니티 { background:#b8326e; } .t칼럼 { background:#2e7d32; } .t생기부 { background:#8a6d00; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { font:700 .92rem var(--body); background:var(--bean); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; }
 button.ghost, a.btn { background:transparent; color:var(--ink); border:1px solid var(--line); }
@@ -171,7 +171,7 @@ __SECTIONS__
 const DATA = __PAYLOAD__;
 const nav = document.getElementById('nav');
 document.querySelectorAll('.post').forEach((s, i) => {
-  const a = document.createElement('a'); a.href = '#p' + i; a.textContent = s.querySelector('.type').textContent + ' · ' + (s.querySelector('.slot').textContent.includes('아침') ? '☀ ' : '☾ ') + DATA[i].title.slice(0, 18);
+  const a = document.createElement('a'); a.href = '#p' + i; a.textContent = s.querySelector('.type').textContent + ' · ' + ({아침:'☀ ',점심:'◐ ',저녁:'☾ ',밤:'★ '}[(s.querySelector('.slot').textContent.match(/아침|점심|저녁|밤/)||['저녁'])[0]]) + DATA[i].title.slice(0, 18);
   nav.appendChild(a);
 });
 function say(i, t) { const el = document.getElementById('s' + i); el.textContent = t; }
