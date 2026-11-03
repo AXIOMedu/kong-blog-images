@@ -13,6 +13,9 @@ post에 "slot":"아침|점심|저녁|밤" 을 넣으면 추천 발행 시간(아
   본문 이미지와 다른 세트를 쓰려면 post에 "cards":["저장소 상대경로", ...] 를 직접 넣음.
   카드가 있으면 '카드뉴스로 추출' 버튼이 생기고, 누르면 카드 미리보기 + 'zip으로 저장'(브라우저에서 바로 묶음) + '인스타 캡션 복사'가 열림.
   "ig_caption":"인스타 캡션" 은 이 패널 안에서만 보임. "cardnews_zip"(선택)은 저장 기능이 막힐 때 쓰는 예비 링크.
+클립(네이버 클립 숏폼, 9:16 MP4): 모든 글에 '클립 만들기' 버튼. 누르면 브라우저가 썸네일→본문 이미지(최대 5장)→마무리 화면을
+  자막·효과음·배경음과 함께 바로 녹화(약 25~30초). 자막은 각 이미지 아래 "▲ 캡션"을 그대로 씀(토큰 0).
+  post에 "clip":{"hook":"상단 고정 문구(20자 안팎)","caps":["장면별 자막", ...]} 를 넣으면 그걸 우선 사용(선택).
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -69,7 +72,7 @@ def build(spec):
         slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티", "뉴스", "시기") else "저녁")
         when = {"아침": "아침 7~9시", "점심": "점심 12~1시", "저녁": "저녁 6~9시", "밤": "밤 10~12시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
-                        "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", ""), "zipname": f'카드뉴스_{spec["date"]}_p{i+1}.zip'})
+                        "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", ""), "zipname": f'카드뉴스_{spec["date"]}_p{i+1}.zip', "clip": p.get("clip") or {}, "clipname": f'클립_{spec.get("brand","경제콩")}_{spec["date"]}_p{i+1}'})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
         if p.get("keyword"):
             subs = " · ".join(html.escape(k) for k in p.get("sub_keywords", []))
@@ -98,8 +101,14 @@ def build(spec):
 <button type="button" class="ghost" data-act="title" data-i="{i}">제목 복사</button>
 <button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button>
 {'<button type="button" class="cnbtn" data-act="cn" data-i="'+str(i)+'" aria-expanded="false">카드뉴스로 추출</button>' if has_cards else ""}
+<button type="button" class="clbtn" data-act="clip" data-i="{i}" aria-expanded="false">클립 만들기</button>
 <span class="status" id="s{i}" role="status"></span></div>
-{cn}{cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
+{cn}<div class="cl" id="cl{i}" hidden><canvas width="1080" height="1920" id="cv{i}"></canvas><div class="clside">
+<p class="cnhead">네이버 클립용 세로 영상 (9:16, 약 30초)</p>
+<p class="clnote">썸네일 → 본문 이미지 → 마무리 순서로, 자막·효과음·배경음이 들어가. 저장 중엔 화면을 켜두고 이 탭을 벗어나지 마.</p>
+<div class="actions"><button type="button" data-act="clplay" data-i="{i}">미리보기</button><button type="button" data-act="clrec" data-i="{i}">영상 저장</button>
+<label class="clmute"><input type="checkbox" id="bgm{i}" checked> 배경음</label></div>
+<p class="status" id="cs{i}" role="status"></p></div></div>{cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
         secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 글이 여기 채워져.</p></article></section>')
@@ -155,6 +164,13 @@ article .red { color:var(--red); } article .blue { color:var(--blue); }
 .cnhead { margin:0; font-weight:700; font-size:.92rem; }
 .cngrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:8px; }
 .cngrid img { width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:6px; border:1px solid var(--line); display:block; }
+.clbtn { background:#c8102e; color:#fff; }
+.cl { background:var(--paper); border:2px solid #c8102e; border-radius:10px; padding:14px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+.cl[hidden] { display:none; }
+.cl canvas { width:min(270px, 100%); aspect-ratio:9/16; height:auto; border-radius:8px; background:#111; }
+.clside { flex:1 1 220px; display:grid; gap:10px; min-width:0; }
+.clnote { margin:0; font-size:.85rem; color:var(--muted); line-height:1.6; }
+.clmute { font-size:.88rem; display:flex; align-items:center; gap:6px; }
 .igcap { margin:0; white-space:pre-wrap; font:.85rem/1.6 var(--body); color:var(--muted); max-height:9em; overflow:auto; }
 .warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
@@ -220,6 +236,9 @@ document.addEventListener('click', e => {
   if (act === 'ig') copyText(i, DATA[i].ig, '인스타 캡션');
   if (act === 'cn') toggleCards(i, b);
   if (act === 'zip') saveZip(i);
+  if (act === 'clip') toggleClip(i, b);
+  if (act === 'clplay') runClip(i, false);
+  if (act === 'clrec') runClip(i, true);
 });
 function cardImgs(i) {
   const g = document.querySelector('#cn' + i + ' .cngrid');
@@ -255,6 +274,208 @@ async function saveZip(i) {
       say(i, '다운로드 시작. 안 되면 카드를 길게 눌러 하나씩 저장해줘.');
     }
   } catch (e) { say(i, '묶기 실패. 카드를 길게 눌러 하나씩 저장하거나 예비 zip 링크를 써줘.'); }
+}
+
+/* ===== 네이버 클립 메이커: 캔버스 1080x1920 + Web Audio(효과음·배경음) + MediaRecorder ===== */
+const BRAND = "__BRAND__";
+const CW = 1080, CH = 1920, FONT = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
+let clipBusy = false;
+function say2(i, t) { const el = document.getElementById('cs' + i); if (el) el.textContent = t; }
+function toggleClip(i, b) {
+  const box = document.getElementById('cl' + i);
+  box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden));
+  b.textContent = box.hidden ? '클립 만들기' : '클립 닫기';
+  if (!box.hidden) { const sc = clipScenes(i); drawClip(i, sc, 0.2); }
+}
+function clipScenes(i) {
+  const art = document.getElementById('a' + i), imgs = [...art.querySelectorAll('img')];
+  const custom = (DATA[i].clip && DATA[i].clip.caps) || [];
+  const thumb = imgs[0], rest = [];
+  imgs.slice(1).forEach(im => {
+    let cap = '', n = im.nextElementSibling;
+    if (n && n.tagName === 'P' && n.textContent.trim().startsWith('▲')) cap = n.textContent.trim().replace(/^▲\s*/, '').replace(/\s*\((사진|출처)[^)]*\)\s*$/, '');
+    rest.push({ img: im, cap });
+  });
+  const cards = rest.slice(0, 5).map((r, k) => ({ type: 'card', img: r.img, cap: custom[k] || r.cap, dur: 4.6 }));
+  const hook = (DATA[i].clip && DATA[i].clip.hook) || DATA[i].title.split(/[,?]/)[0];
+  let t = 0; const sc = [];
+  if (thumb) sc.push({ type: 'hook', img: thumb, dur: 3.2 });
+  cards.forEach(c => sc.push(c));
+  sc.push({ type: 'end', dur: 2.8 });
+  sc.forEach(x => { x.t0 = t; t += x.dur; });
+  sc.total = t; sc.hook = hook; return sc;
+}
+function wrapText(ctx, text, maxW, maxLines) {
+  const words = text.split(/(\s+)/), lines = []; let cur = '';
+  const push = w => {
+    if (ctx.measureText(cur + w).width <= maxW) { cur += w; return; }
+    if (cur.trim()) { lines.push(cur.trim()); cur = ''; }
+    if (ctx.measureText(w).width <= maxW) { cur = w.trimStart(); return; }
+    for (const ch of w) { if (ctx.measureText(cur + ch).width > maxW) { lines.push(cur); cur = ch; } else cur += ch; }
+  };
+  words.forEach(push); if (cur.trim()) lines.push(cur.trim());
+  if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = lines[maxLines - 1].replace(/.{1}$/, '…'); }
+  return lines;
+}
+const ease = x => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+function drawFit(ctx, img, cx, cy, maxW, maxH, scale) {
+  const r = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight) * scale;
+  const w = img.naturalWidth * r, h = img.naturalHeight * r;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h); ctx.restore();
+}
+function drawClip(i, sc, t) {
+  const cv = document.getElementById('cv' + i), ctx = cv.getContext('2d');
+  ctx.fillStyle = '#f6f3ee'; ctx.fillRect(0, 0, CW, CH);
+  const k = sc.findIndex(x => t >= x.t0 && t < x.t0 + x.dur), s = sc[k < 0 ? sc.length - 1 : k], lt = t - s.t0;
+  // 진행 바
+  ctx.fillStyle = '#ddd8cf'; ctx.fillRect(60, 70, CW - 120, 10);
+  ctx.fillStyle = '#c8102e'; ctx.fillRect(60, 70, (CW - 120) * Math.min(t / sc.total, 1), 10);
+  ctx.font = `700 34px ${FONT}`; ctx.fillStyle = '#2e9e22'; ctx.textAlign = 'left'; ctx.fillText(BRAND, 60, 140);
+  if (s.type === 'hook') {
+    const sc1 = 1.12 - 0.12 * ease(lt / 0.6);
+    drawFit(ctx, s.img, CW / 2, CH / 2 - 40, 1000, 1100, sc1);
+    ctx.font = `900 54px ${FONT}`; ctx.fillStyle = '#111'; ctx.textAlign = 'center';
+    if (lt > 0.8) { ctx.globalAlpha = ease((lt - 0.8) / 0.4); ctx.fillText('끝까지 보면 숫자로 답 나옴', CW / 2, CH - 260); ctx.globalAlpha = 1; }
+    return;
+  }
+  // 상단 고정 문구(타자 효과는 첫 카드에서만)
+  const first = sc.find(x => x.type === 'card');
+  let head = sc.hook;
+  if (s === first) head = head.slice(0, Math.ceil(head.length * Math.min(lt / 1.2, 1)));
+  ctx.font = `900 66px ${FONT}`; ctx.fillStyle = '#111'; ctx.textAlign = 'center';
+  wrapText(ctx, head, CW - 140, 2).forEach((ln, n) => ctx.fillText(ln, CW / 2, 250 + n * 84));
+  if (s.type === 'end') {
+    ctx.globalAlpha = ease(lt / 0.5);
+    ctx.fillStyle = '#111'; ctx.fillRect(80, 760, CW - 160, 420);
+    ctx.fillStyle = '#fff'; ctx.font = `900 64px ${FONT}`; ctx.fillText('자세한 숫자는 블로그에서', CW / 2, 920);
+    ctx.font = `700 46px ${FONT}`; ctx.fillStyle = '#ffdd00'; ctx.fillText(`네이버 블로그 '${BRAND}'`, CW / 2, 1020);
+    ctx.font = `500 38px ${FONT}`; ctx.fillStyle = '#ccc'; ctx.fillText('프로필 눌러서 전체 글 보기', CW / 2, 1100);
+    ctx.globalAlpha = 1; return;
+  }
+  const enter = ease(lt / 0.35), x = CW / 2 + (1 - enter) * 300;
+  ctx.globalAlpha = enter; drawFit(ctx, s.img, x, 900, 980, 960, 1 + 0.05 * (lt / s.dur)); ctx.globalAlpha = 1;
+  if (s.cap) {
+    const pop = ease((lt - 0.4) / 0.25);
+    if (pop > 0) {
+      ctx.font = `800 54px ${FONT}`;
+      const lines = wrapText(ctx, s.cap, CW - 200, 3), bh = 60 + lines.length * 72, by = 1520 - bh / 2;
+      ctx.save(); ctx.translate(CW / 2, 1520); ctx.scale(0.9 + 0.1 * pop, 0.9 + 0.1 * pop); ctx.translate(-CW / 2, -1520);
+      ctx.globalAlpha = pop; ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.roundRect(70, by, CW - 140, bh, 26); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+      lines.forEach((ln, n) => ctx.fillText(ln, CW / 2, by + 78 + n * 72));
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+  }
+}
+/* 효과음·배경음(전부 코드로 합성 → 음원 파일·저작권 없음) */
+function noiseBuf(ac, sec) { const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate), d = b.getChannelData(0); for (let n = 0; n < d.length; n++) d[n] = Math.random() * 2 - 1; return b; }
+function sfxWhoosh(ac, out, at) {
+  const src = ac.createBufferSource(); src.buffer = noiseBuf(ac, 0.45);
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(400, at); f.frequency.exponentialRampToValueAtTime(3500, at + 0.35);
+  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.5, at + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+  src.connect(f).connect(g).connect(out); src.start(at); src.stop(at + 0.45);
+}
+function sfxPop(ac, out, at) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(900, at); o.frequency.exponentialRampToValueAtTime(320, at + 0.12);
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.45, at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+  o.connect(g).connect(out); o.start(at); o.stop(at + 0.18);
+}
+function sfxTick(ac, out, at) {
+  const src = ac.createBufferSource(); src.buffer = noiseBuf(ac, 0.03);
+  const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 3000;
+  const g = ac.createGain(); g.gain.setValueAtTime(0.25, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
+  src.connect(f).connect(g).connect(out); src.start(at);
+}
+function bgm(ac, out, t0, dur) {
+  const bpm = 96, beat = 60 / bpm, bus = ac.createGain(); bus.gain.setValueAtTime(0.0001, t0);
+  bus.gain.exponentialRampToValueAtTime(0.5, t0 + 0.8); bus.gain.setValueAtTime(0.5, t0 + dur - 1.6); bus.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  bus.connect(out);
+  const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(bus);
+  for (let b = 0, t = t0; t < t0 + dur; b++, t += beat) {
+    if (b % 4 === 0) { // 마디마다 코드 패드
+      const ch = chords[(b / 4) % 4];
+      ch.forEach(m => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = hz(m);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + beat * 4);
+        o.connect(g).connect(lp); o.start(t); o.stop(t + beat * 4 + 0.05); });
+      const bo = ac.createOscillator(), bg = ac.createGain(); bo.type = 'sine'; bo.frequency.value = hz(ch[0] - 12);
+      bg.gain.setValueAtTime(0.0001, t); bg.gain.exponentialRampToValueAtTime(0.18, t + 0.05); bg.gain.exponentialRampToValueAtTime(0.0001, t + beat * 2);
+      bo.connect(bg).connect(bus); bo.start(t); bo.stop(t + beat * 2 + 0.05);
+    }
+    if (b % 2 === 0) { // 킥
+      const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.15);
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.22);
+    }
+    [0, 0.5].forEach(off => { // 하이햇
+      const tt = t + off * beat, src = ac.createBufferSource(); src.buffer = noiseBuf(ac, 0.05);
+      const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+      const g = ac.createGain(); g.gain.setValueAtTime(off ? 0.06 : 0.1, tt); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.05);
+      src.connect(f).connect(g).connect(bus); src.start(tt);
+    });
+  }
+}
+function pickMime() {
+  const c = ['video/mp4;codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+}
+async function runClip(i, record) {
+  if (clipBusy) { say2(i, '다른 클립을 만드는 중이야. 끝나고 다시 눌러줘.'); return; }
+  clipBusy = true;
+  try {
+    try { await document.fonts.load(`900 66px "Noto Sans KR"`); await document.fonts.load(`700 46px "Noto Sans KR"`); } catch (_) {}
+    const sc = clipScenes(i), ac = new (window.AudioContext || window.webkitAudioContext)();
+    await ac.resume();
+    const master = ac.createGain(); master.gain.value = 0.9;
+    const dest = ac.createMediaStreamDestination(); master.connect(dest); master.connect(ac.destination);
+    const t0 = ac.currentTime + 0.25;
+    if (document.getElementById('bgm' + i).checked) bgm(ac, master, t0, sc.total);
+    sc.forEach(s => {
+      const at = t0 + s.t0;
+      if (s.type === 'hook') sfxPop(ac, master, at + 0.05);
+      else sfxWhoosh(ac, master, at);
+      if (s.type === 'card' && s.cap) sfxPop(ac, master, at + 0.42);
+    });
+    const first = sc.find(x => x.type === 'card');
+    if (first) for (let n = 0; n < 10; n++) sfxTick(ac, master, t0 + first.t0 + 0.05 + n * 0.11);
+    let rec = null, chunks = [], mime = '';
+    if (record) {
+      mime = pickMime();
+      if (!mime) { say2(i, '이 브라우저는 영상 녹화를 지원하지 않아. 크롬이나 사파리 최신 버전으로 열어줘.'); return; }
+      const cv = document.getElementById('cv' + i);
+      const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+      rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+      rec.start(500);
+    }
+    say2(i, record ? '녹화 중… 화면을 켜둔 채로 기다려줘.' : '미리보기 재생 중');
+    await new Promise(res => {
+      const loop = () => {
+        const t = ac.currentTime - t0;
+        drawClip(i, sc, Math.max(t, 0));
+        if (record && t > 0) say2(i, `녹화 중… ${Math.min(Math.ceil(t), Math.ceil(sc.total))} / ${Math.ceil(sc.total)}초`);
+        if (t < sc.total + 0.15) requestAnimationFrame(loop); else res();
+      };
+      requestAnimationFrame(loop);
+    });
+    if (record) {
+      await new Promise(r => { rec.onstop = r; rec.stop(); });
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] });
+      let dl = null; try { dl = await window.claude?.use?.('downloads'); } catch (_) {}
+      const name = DATA[i].clipname + '.' + ext;
+      if (dl) {
+        try { await dl.save({ filename: name, data: blob }); say2(i, ext === 'mp4' ? '저장됨. 블로그 앱 + → 클립 만들기에서 이 영상 고르면 돼.' : 'WebM으로 저장됐어(이 브라우저는 MP4 녹화 미지원). 네이버 클립이 안 받으면 말해줘, MP4로 바꿔줄게.'); }
+        catch (e) { say2(i, e && e.code === 'declined' ? '저장 취소됨.' : '저장이 막혔어. 다시 눌러줘.'); }
+      } else {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        say2(i, '다운로드 시작.');
+      }
+    } else say2(i, '미리보기 끝. 괜찮으면 영상 저장을 눌러줘.');
+    ac.close();
+  } catch (e) { say2(i, '영상 만들기 실패: ' + (e && e.message || e)); }
+  finally { clipBusy = false; }
 }
 </script>
 """
