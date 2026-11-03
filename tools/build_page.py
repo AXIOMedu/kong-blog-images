@@ -371,7 +371,7 @@ function drawClip(i, sc, t) {
     const sc1 = 1.12 - 0.12 * ease(lt / 0.6);
     drawFit(ctx, s.img, CW / 2, CH / 2 - 40, 1000, 1100, sc1);
     ctx.font = `900 54px ${FONT}`; ctx.fillStyle = '#111'; ctx.textAlign = 'center';
-    if (lt > 0.8) { ctx.globalAlpha = ease((lt - 0.8) / 0.4); ctx.fillText('끝까지 보면 숫자로 답 나옴', CW / 2, CH - 260); ctx.globalAlpha = 1; }
+    if (lt > 0.8) { ctx.globalAlpha = ease((lt - 0.8) / 0.4); ctx.fillText(BRAND === '멘토콩' ? '끝까지 보면 정리 끝' : '끝까지 보면 숫자로 답 나옴', CW / 2, CH - 260); ctx.globalAlpha = 1; }
     return;
   }
   // 상단 고정 문구(타자 효과는 첫 카드에서만)
@@ -383,7 +383,7 @@ function drawClip(i, sc, t) {
   if (s.type === 'end') {
     ctx.globalAlpha = ease(lt / 0.5);
     ctx.fillStyle = '#111'; ctx.fillRect(80, 760, CW - 160, 420);
-    ctx.fillStyle = '#fff'; ctx.font = `900 64px ${FONT}`; ctx.fillText('자세한 숫자는 블로그에서', CW / 2, 920);
+    ctx.fillStyle = '#fff'; ctx.font = `900 64px ${FONT}`; ctx.fillText(BRAND === '멘토콩' ? '자세한 내용은 블로그에서' : '자세한 숫자는 블로그에서', CW / 2, 920);
     ctx.font = `700 46px ${FONT}`; ctx.fillStyle = '#ffdd00'; ctx.fillText(`네이버 블로그 '${BRAND}'`, CW / 2, 1020);
     ctx.font = `500 38px ${FONT}`; ctx.fillStyle = '#ccc'; ctx.fillText('프로필 눌러서 전체 글 보기', CW / 2, 1100);
     ctx.globalAlpha = 1; return;
