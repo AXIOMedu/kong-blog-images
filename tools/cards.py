@@ -11,6 +11,7 @@ AI 사진 대신 쓰는 '사람이 만든 티 나는' 정보 이미지: 표, 요
   type "cover"(표지, frame card 전용): tag(작은 말머리), title(2줄까지, \n으로 줄바꿈), sub(한 줄), color(강조색).
     제목은 세로 가운데에 둬서 네이버 썸네일(정사각·16:9)로 잘려도 보인다.
   카드 내용이 많아 1350px를 넘으면 경고가 나온다 → 행·항목을 줄인다.
+  카드 모드에서는 source의 "멘토콩 정리"는 지우고 "멘토콩 계산"은 "직접 계산"으로 바꾼다(학원 인스타용 워터마크 교체 대비).
 공통 키: mark(선택, 기본 "경제콩"), out, type, title(결론형 한 줄, 25자 이내), sub(선택), source(선택, "출처: ..." → "자료: ..."로 표시)
 type별 키
   summary   : points ["한 줄", "한 줄", "한 줄"]          (오늘 결론 3줄 카드. 2~4개)
@@ -21,7 +22,7 @@ type별 키
   timeline  : events [{"date":"2026.9","text":"노바티스와 계약"}, ...], highlight 2(선택)   (3~7개)
   stat      : stats [{"label":"52주 고점 대비","value":"-61%","note":"10/30 종가 기준"}, ...]  (2~4개, 첫 번째가 빨강)
 """
-import base64, html, json, os, sys, tempfile
+import base64, html, json, os, re, sys, tempfile
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__)); FD = os.path.join(HERE, "fonts")
@@ -155,6 +156,11 @@ def body(s):
 def page(s):
     src = s.get("source", "").strip()
     if src.startswith("출처:"): src = "자료:" + src[3:]
+    if s.get("frame") == "card":  # 카드뉴스는 학원 인스타에도 쓰이므로 블로그 이름(멘토콩)을 출처 줄에 남기지 않는다
+        src = src.replace("멘토콩 계산", "직접 계산").replace("멘토콩 정리", "").replace("멘토콩", "")
+        src = re.sub(r"\s*[·,]\s*(?=[·,]|$)", "", src); src = re.sub(r"(자료:)\s*[·,]\s*", r"\1 ", src).strip(" ·,")
+        if src in ("자료:", "자료"): src = ""
+        elif src and not src.startswith("자료:") and any(k in s.get("source", "") for k in ("출처:", "자료:")): src = "자료: " + src
     card = s.get("frame") == "card"
     mark = (f"<span class='ax'><img src='{icon_uri()}'>AXIOM</span>" if s.get("brand") == "AXIOM"
             else f"<span class='mark'>{E(s.get('mark', '경제콩'))}</span>")
