@@ -23,7 +23,8 @@ body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py�
 - 미리보기: 이미지를 data URI로 박아 넣음 (아티팩트는 외부 이미지를 못 띄움)
 - 복사용: 소제목·'한 줄 정리' 앞에 빈 줄 자동 삽입. 본문 맨 끝에 '#태그 #태그' 줄 자동 추가(띄어쓰기 제거). 이미지는 raw.githubusercontent.com/<sha> 주소, 형광펜·가운데 정렬은 인라인 스타일 (네이버 붙여넣기 호환)
 """
-import base64, html, json, re, sys, os
+import base64, html, io, json, re, sys, os
+from PIL import Image
 
 REPO = "AXIOMedu/kong-blog-images"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +52,11 @@ def to_naver(body, sha, tags=""):
     if tags.strip():  # 본문 맨 끝 해시태그 줄: 네이버가 본문 #태그를 태그로 자동 등록하는지 사용자 테스트용
         b += BLANK + f'<p style="text-align:center">{html.escape(tag_line(tags))}</p>'
     return b
+
+def logo_uri(name, h=110):
+    im = Image.open(os.path.join(ROOT, "brand", name)); r = h / im.height
+    im = im.resize((round(im.width * r), h), Image.LANCZOS); b = io.BytesIO(); im.save(b, "PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(b.getvalue()).decode()
 
 def data_uri(rel):
     p = os.path.join(ROOT, rel)
@@ -87,6 +93,7 @@ def build(spec):
             cap = f'<pre class="igcap">{html.escape(p["ig_caption"])}</pre>' if p.get("ig_caption") else ""
             cn = f'''<div class="cn" id="cn{i}" hidden><p class="cnhead">인스타 카드뉴스 · <b class="cnn"></b>장 (1080×1350, AXIOM)</p>
 <div class="cngrid" data-explicit="{1 if pre else 0}">{pre}</div>
+<label class="cnbrand">워터마크 <select id="cnb{i}" data-i="{i}"><option value="AXIOM">AXIOM (원본)</option><option value="prime">더프라임멘토링 (한빛 인스타용)</option><option value="hanbit">한빛수학학원</option><option value="onbit">온빛관리형스터디랩</option></select></label>
 <div class="actions"><button type="button" data-act="zip" data-i="{i}">zip으로 저장</button>{ig}{zl}</div>{cap}</div>'''
         gpt = ""
         if p.get("gpt_prompt"):
@@ -114,6 +121,7 @@ def build(spec):
         secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 글이 여기 채워져.</p></article></section>')
     warn = "" if spec.get("sha") else '<p class="warn">오늘은 이미지 업로드가 실패했어. 본문 복사엔 사진이 빠져 있으니, 미리보기 사진을 우클릭 → 이미지 복사로 넣어줘.</p>'
     return TEMPLATE.replace("__BRAND__", html.escape(spec.get("brand", "경제콩"))).replace("__WARN__", warn).replace("__DATE__", html.escape(spec["date"])).replace("__SECTIONS__", "\n".join(secs)) \
+                   .replace("__LOGOS__", json.dumps({"prime": logo_uri("theprime_h.png"), "hanbit": logo_uri("hanbit_h.png"), "onbit": logo_uri("onbit_h.png")})) \
                    .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False).replace("</", "<\\/"))
 
 TEMPLATE = r"""<title>__BRAND__ 발행함</title>
@@ -171,6 +179,8 @@ article .red { color:var(--red); } article .blue { color:var(--blue); }
 .clside { flex:1 1 220px; display:grid; gap:10px; min-width:0; }
 .clnote { margin:0; font-size:.85rem; color:var(--muted); line-height:1.6; }
 .clmute { font-size:.88rem; display:flex; align-items:center; gap:6px; }
+.cnbrand { font-size:.9rem; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.cnbrand select { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
 .igcap { margin:0; white-space:pre-wrap; font:.85rem/1.6 var(--body); color:var(--muted); max-height:9em; overflow:auto; }
 .warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
@@ -240,18 +250,42 @@ document.addEventListener('click', e => {
   if (act === 'clplay') runClip(i, false);
   if (act === 'clrec') runClip(i, true);
 });
-function cardImgs(i) {
+const LOGOS = __LOGOS__;
+const LOGO_H = { prime: 40, hanbit: 46, onbit: 34 }, BRAND_NAME = { AXIOM: 'AXIOM', prime: '더프라임멘토링', hanbit: '한빛수학학원', onbit: '온빛관리형스터디랩' };
+const logoImg = {};
+function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
+function cardSrcs(i) {
   const g = document.querySelector('#cn' + i + ' .cngrid');
-  if (g.dataset.explicit === '1') return [...g.querySelectorAll('img')];
-  return [...document.querySelectorAll('#a' + i + ' img[data-card]')];
+  if (g.dataset.explicit === '1') return [...g.querySelectorAll('img')].map(im => im.dataset.orig || im.src);
+  return [...document.querySelectorAll('#a' + i + ' img[data-card]')].map(im => im.src);
+}
+// 카드 오른쪽 아래 AXIOM 워터마크 자리(1080x1350 기준 x 830~1016, y 1244~1306)를 배경색으로 덮고 학원 로고를 얹는다
+async function rebrand(src, brand) {
+  if (!brand || brand === 'AXIOM') return src;
+  const im = await loadImg(src);
+  if (im.naturalWidth !== 1080 || im.naturalHeight !== 1350) return src;
+  logoImg[brand] = logoImg[brand] || await loadImg(LOGOS[brand]);
+  const lg = logoImg[brand], h = LOGO_H[brand], w = lg.naturalWidth * h / lg.naturalHeight;
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1350; const ctx = c.getContext('2d');
+  ctx.drawImage(im, 0, 0);
+  ctx.fillStyle = '#f6f3ee'; ctx.fillRect(Math.min(820, 1016 - w - 8), 1238, 1080, 74);
+  ctx.drawImage(lg, 1016 - w, 1275 - h / 2, w, h);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+async function refreshGrid(i) {
+  const brand = document.getElementById('cnb' + i).value, srcs = cardSrcs(i), imgs = [...document.querySelectorAll('#cn' + i + ' .cngrid img')];
+  for (let k = 0; k < imgs.length; k++) imgs[k].src = await rebrand(srcs[k], brand);
 }
 function toggleCards(i, b) {
   const box = document.getElementById('cn' + i), g = box.querySelector('.cngrid');
-  if (g.dataset.explicit !== '1' && !g.children.length) cardImgs(i).forEach(im => { const c = document.createElement('img'); c.alt = ''; c.src = im.src; g.appendChild(c); });
-  box.querySelector('.cnn').textContent = cardImgs(i).length;
+  if (g.dataset.explicit === '1') g.querySelectorAll('img').forEach(im => { if (!im.dataset.orig) im.dataset.orig = im.src; });
+  else if (!g.children.length) cardSrcs(i).forEach(src => { const c = document.createElement('img'); c.alt = ''; c.src = src; g.appendChild(c); });
+  box.querySelector('.cnn').textContent = cardSrcs(i).length;
   box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden));
   b.textContent = box.hidden ? '카드뉴스로 추출' : '카드뉴스 닫기';
 }
+document.addEventListener('change', e => { const sel = e.target.closest('select[id^="cnb"]'); if (sel) refreshGrid(+sel.dataset.i); });
+function zipName(i) { const b = document.getElementById('cnb' + i).value; return b === 'AXIOM' ? DATA[i].zipname : DATA[i].zipname.replace('.zip', '_' + BRAND_NAME[b] + '.zip'); }
 let zipLib = null;
 function loadZip() {
   if (window.JSZip) return Promise.resolve(window.JSZip);
@@ -262,15 +296,16 @@ async function saveZip(i) {
   say(i, '카드 묶는 중…');
   try {
     const JSZip = await loadZip(), z = new JSZip();
-    cardImgs(i).forEach((im, k) => { const [h, b64] = im.src.split(','); z.file(String(k + 1).padStart(2, '0') + (h.includes('png') ? '.png' : '.jpg'), b64, { base64: true }); });
+    const brand = document.getElementById('cnb' + i).value, srcs = cardSrcs(i);
+    for (let k = 0; k < srcs.length; k++) { const [h, b64] = (await rebrand(srcs[k], brand)).split(','); z.file(String(k + 1).padStart(2, '0') + (h.includes('png') ? '.png' : '.jpg'), b64, { base64: true }); }
     if (DATA[i].ig) z.file('caption.txt', DATA[i].ig);
     const blob = await z.generateAsync({ type: 'blob' });
     let dl = null; try { dl = await window.claude?.use?.('downloads'); } catch (_) {}
     if (dl) {
-      try { await dl.save({ filename: DATA[i].zipname, data: blob }); say(i, '저장됨. 원장님께 이 zip + 캡션 보내면 끝.'); }
+      try { await dl.save({ filename: zipName(i), data: blob }); say(i, '저장됨. 원장님께 이 zip + 캡션 보내면 끝.'); }
       catch (e) { say(i, e && e.code === 'declined' ? '저장 취소됨.' : '저장이 막혔어. 카드를 길게 눌러 하나씩 저장하거나 예비 zip 링크를 써줘.'); }
     } else {
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = DATA[i].zipname; document.body.appendChild(a); a.click(); a.remove();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = zipName(i); document.body.appendChild(a); a.click(); a.remove();
       say(i, '다운로드 시작. 안 되면 카드를 길게 눌러 하나씩 저장해줘.');
     }
   } catch (e) { say(i, '묶기 실패. 카드를 길게 눌러 하나씩 저장하거나 예비 zip 링크를 써줘.'); }
