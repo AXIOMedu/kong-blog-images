@@ -4,9 +4,9 @@
 
 ## 웹 접근 규칙 (2026-11-05 사용자 요청, 꼭 지킬 것)
 - 처음 보는 사이트를 WebFetch로 열 때마다 사용자에게 허용 창이 뜨고, 사용자가 자는 동안 작업이 거기서 멈춘다.
-- 그래서 뉴스 찾기·사실 확인은 WebSearch를 기본으로 쓴다.
+- 그래서 뉴스·자료는 WebSearch로 찾고, 원문을 읽어야 하면 고정 목록 안의 출처를 골라 WebFetch한다(같은 내용이면 목록 안 언론·기관 기사를 고른다). 글 품질을 위해 원문 확인은 계속 한다.
 - WebFetch는 아래 고정 목록 도메인만 연다. 목록 밖 주소는 WebFetch하지 않는다. 원문 확인이 필요한데 목록 밖이면 WebSearch 결과에 나온 내용으로만 확인하고, 그걸로 확인이 안 되는 숫자는 쓰지 않는다.
-- 고정 목록: suggestqueries.google.com, www.moe.go.kr, www.adiga.kr, www.suneung.re.kr, www.kice.re.kr, pubmed.ncbi.nlm.nih.gov, www.who.int, www.kdca.go.kr
+- 고정 목록(주요 언론·공식기관·논문, 사용자가 '항상 허용'으로 한 번씩 승인해 두는 곳): suggestqueries.google.com, www.moe.go.kr, www.adiga.kr, www.kcue.or.kr, www.suneung.re.kr, www.kice.re.kr, www.sen.go.kr, www.yna.co.kr, www.veritas-a.com, www.edujin.co.kr, www.dhnews.co.kr, news.unn.net, www.hankyung.com, www.mk.co.kr, www.chosun.com, www.donga.com, pubmed.ncbi.nlm.nih.gov, www.nih.gov, www.cdc.gov, www.who.int, www.kdca.go.kr, www.mohw.go.kr, kosis.kr, www.nature.com, www.science.org, www.nobelprize.org, en.wikipedia.org, ko.wikipedia.org
 - 셸의 git·curl은 이 규칙과 무관하다.
 
 절대 규칙
