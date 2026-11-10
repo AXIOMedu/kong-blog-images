@@ -26,6 +26,10 @@ spec.json 예시
                      lines 2~4줄(각 18자 안팎, 말하듯 1인칭), hl은 lines 안의 강조할 글자(노란 형광, 선택). time·date 생략 시 지금 시각.
   C 텍스트 카드(기초): {"style":"C","out":"...","series":"주식공부 #1","l1":"PER이 낮으면","l2":"정말 싼 걸까?",
                      "sub":"제약사 예시로 3분 만에 이해하기","color":"#1f6feb"}
+  H 홈판 후킹형(홈판형 글 기본): {"style":"H","out":"...","lines":["30대가","가난해지는","5가지 습관"],"hl":[1],"bg":"#ffd43b"}
+                     홈판 상위 글 썸네일 패턴(큰 글씨 2~3줄, 한 줄만 빨강 강조). lines 2~3줄·각 7자 안팎, hl = 빨강으로 칠할 줄 번호(0부터).
+                     bg = 단색(노랑 #ffd43b / 흰 #ffffff / 검정 #111111) 또는 "photo":"로컬 사진" → 사진이면 줄마다 흰 띠를 깔고 검정 글씨(자막 스타일).
+                     "sub"(선택) 18자 이내 작은 부제. 글자는 전부 16:9 안전영역(세로 236~844) 안에 자동 배치.
 """
 import io, json, sys, math, random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -206,9 +210,36 @@ def style_m(s):
             d.text((x0, y), ln, font=fb, fill=INK); y += 82
     return img
 
+def style_h(s):
+    # 홈판 후킹형: 큰 글씨 2~3줄, 강조 줄은 빨강. 사진 배경이면 흰 자막 띠.
+    photo = s.get("photo")
+    if photo:
+        img = cover(Image.open(photo).convert("RGB"), W, H).convert("RGBA")
+        img.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 70)))
+    else:
+        img = Image.new("RGBA", (W, H), rgb(s.get("bg", "#ffd43b")) + (255,))
+    d = ImageDraw.Draw(img)
+    lines = s["lines"][:3]; hl = s.get("hl", [len(lines) - 1]); hl = [hl] if isinstance(hl, int) else hl
+    size = min(fit(d, ln, 170, W - 160).size for ln in lines)
+    f = font(size); lh = int(size * 1.22)
+    sub = s.get("sub"); fs = font(46, "Bold")
+    total = lh * len(lines) + (80 if sub else 0)
+    y = 236 + (608 - total) // 2
+    dark_bg = not photo and sum(rgb(s.get("bg", "#ffd43b"))) < 300
+    for i, ln in enumerate(lines):
+        tw = d.textlength(ln, font=f); x = (W - tw) // 2
+        col = (224, 49, 49) if i in hl else ((255, 255, 255) if dark_bg else (17, 17, 17))
+        if photo:
+            d.rectangle([x - 24, y + int(size * 0.12), x + tw + 24, y + int(size * 1.18)], fill=(255, 255, 255))
+        d.text((x, y), ln, font=f, fill=col); y += lh
+    if sub:
+        tw = d.textlength(sub, font=fs)
+        d.text(((W - tw) // 2, y + 18), sub, font=fs, fill=(255, 255, 255) if (photo or dark_bg) else (60, 60, 60))
+    mark(d, dark=bool(photo) or dark_bg); return img.convert("RGB")
+
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1]))
     for s in (spec if isinstance(spec, list) else [spec]):
         MARK = s.get("mark", "경제콩")
-        img = {"A": style_a, "B": style_b, "C": style_c, "P": style_p, "M": style_m}[s["style"]](s)
+        img = {"A": style_a, "B": style_b, "C": style_c, "P": style_p, "M": style_m, "H": style_h}[s["style"]](s)
         img.convert("RGB").save(s["out"], quality=88); print(s["out"])
