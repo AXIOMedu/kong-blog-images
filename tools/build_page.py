@@ -16,6 +16,8 @@ post에 "slot":"아침|점심|저녁|밤" 을 넣으면 추천 발행 시간(아
 클립(네이버 클립 숏폼, 9:16 MP4): 모든 글에 '클립 만들기' 버튼. 누르면 브라우저가 썸네일→본문 이미지(최대 5장)→마무리 화면을
   자막·효과음·배경음과 함께 바로 녹화(약 25~30초). 자막은 각 이미지 아래 "▲ 캡션"을 그대로 씀(토큰 0).
   post에 "clip":{"hook":"상단 고정 문구(20자 안팎)","caps":["장면별 자막", ...]} 를 넣으면 그걸 우선 사용(선택).
+  오늘클립챌린지용(선택): "clip":{"desc":"클립 설명 1~2줄","hashtags":"#오늘클립챌린지 #... (5~8개)","info_tag":"정보태그 제안(예: 쇼핑 — 『이기적 유전자』 책)"}
+  → 클립 패널에 정보태그 제안 + '설명·해시태그 복사' 버튼. 없으면 제목 + #오늘클립챌린지 + 본문 태그 앞 4개로 자동.
 post에 "category":"네이버 카테고리 경로"(예: "헬스케어 투자 > 헬스케어 이슈")를 넣으면 발행함에 표시됨.
 body 규칙: p, h3, b, br, a, img(src=저장소 상대경로, 또는 photos.py가 준 https hotlink 주소), span(class) 만 사용.
   형광펜: hl(노랑·핵심 결론) / hl-g(연두·보조 포인트) / hl-b(하늘·정의·개념) / hl-p(분홍·반전·주의)
@@ -71,6 +73,13 @@ def to_preview(body):
         return f'<img alt=""{card} src="{data_uri(m.group(1))}">'
     return re.sub(r"<img[^>]*src=['\"]([^'\"]+)['\"][^>]*>", emb, body)
 
+def cliptext(p):
+    c = p.get("clip") or {}
+    tags = [x for x in p.get("tags", "").split() if x.startswith("#")][:4]
+    hs = c.get("hashtags") or " ".join(["#오늘클립챌린지"] + [x for x in tags if x != "#오늘클립챌린지"])
+    if "#오늘클립챌린지" not in hs: hs = "#오늘클립챌린지 " + hs
+    return (c.get("desc") or p["title"]) + "\n\n" + hs
+
 def build(spec):
     secs, payload = [], []
     n = len(spec["posts"])
@@ -78,7 +87,7 @@ def build(spec):
         slot = p.get("slot") or ("아침" if p.get("type") in ("이슈", "딥", "커뮤니티", "뉴스", "시기") else "저녁")
         when = {"아침": "아침 7~9시", "점심": "점심 12~1시", "저녁": "저녁 6~9시", "밤": "밤 10~12시"}.get(slot, slot)
         payload.append({"title": p["title"], "tags": p.get("tags", ""), "html": to_naver(p["body"], spec["sha"], p.get("tags", "")),
-                        "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", ""), "zipname": f'카드뉴스_{spec["date"]}_p{i+1}.zip', "clip": p.get("clip") or {}, "clipname": f'클립_{spec.get("brand","경제콩")}_{spec["date"]}_p{i+1}'})
+                        "gpt": p.get("gpt_prompt", ""), "ig": p.get("ig_caption", ""), "zipname": f'카드뉴스_{spec["date"]}_p{i+1}.zip', "clip": p.get("clip") or {}, "cliptext": cliptext(p), "clipname": f'클립_{spec.get("brand","경제콩")}_{spec["date"]}_p{i+1}'})
         cat = f'<p class="cat">카테고리: <b>{html.escape(p["category"])}</b></p>' if p.get("category") else ""
         if p.get("keyword"):
             subs = " · ".join(html.escape(k) for k in p.get("sub_keywords", []))
@@ -115,6 +124,8 @@ def build(spec):
 <p class="clnote">썸네일 → 본문 이미지 → 마무리 순서로, 자막·효과음·배경음이 들어가. 저장 중엔 화면을 켜두고 이 탭을 벗어나지 마.</p>
 <div class="actions"><button type="button" data-act="clplay" data-i="{i}">미리보기</button><button type="button" data-act="clrec" data-i="{i}">영상 저장</button>
 <label class="clmute"><input type="checkbox" id="bgm{i}" checked> 배경음</label></div>
+<p class="clnote">오늘클립챌린지: 정보태그 필수 → {html.escape((p.get("clip") or {}).get("info_tag") or "장소·쇼핑·공연전시축제 중 하나(예: 관련 책을 쇼핑태그로)")} · 전체공개 · 해시태그는 설명 뒤에</p>
+<div class="actions"><button type="button" class="ghost" data-act="cltxt" data-i="{i}">설명·해시태그 복사</button></div>
 <p class="status" id="cs{i}" role="status"></p></div></div>{cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
 <article id="a{i}">{to_preview(p["body"])}</article></section>''')
     if not secs:
@@ -249,6 +260,7 @@ document.addEventListener('click', e => {
   if (act === 'clip') toggleClip(i, b);
   if (act === 'clplay') runClip(i, false);
   if (act === 'clrec') runClip(i, true);
+  if (act === 'cltxt') copyText(i, DATA[i].cliptext, '클립 설명·해시태그');
 });
 const LOGOS = __LOGOS__;
 const LOGO_H = { prime: 40, hanbit: 46, onbit: 34 }, BRAND_NAME = { AXIOM: 'AXIOM', prime: '더프라임멘토링', hanbit: '한빛수학학원', onbit: '온빛관리형스터디랩' };
