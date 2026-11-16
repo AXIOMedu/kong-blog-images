@@ -18,8 +18,7 @@
 import base64, io, json, os, sys, urllib.request, urllib.error
 from PIL import Image
 
-MODELS = [os.environ["GEMINI_IMAGE_MODEL"]] if os.environ.get("GEMINI_IMAGE_MODEL") else \
-         ["gemini-nano-banana-2.1", "gemini-3.1-flash-lite-image", "gemini-2.5-flash-image"]
+MODELS = ["gemini-nano-banana-2.1", "gemini-3.1-flash-lite-image", "gemini-2.5-flash-image"]
 GUARD = (" Style: natural editorial photograph, realistic lighting, shallow depth of field, Korean everyday setting when relevant."
          " Strictly no text, letters, numbers, captions or watermarks in the image. No logos, no brand names, no real product packaging."
          " No identifiable real or famous people; if people appear, show them from behind, hands only, or out of focus."
@@ -38,7 +37,8 @@ def call(model, prompt, aspect, ver):
 
 def gen(s):
     last = ""
-    for model in MODELS:
+    models = [os.environ["GEMINI_IMAGE_MODEL"]] if os.environ.get("GEMINI_IMAGE_MODEL") else MODELS[-3:]
+    for model in models:
         for ver in ("v1", "v1beta"):
             try:
                 raw = call(model, s["prompt"], s.get("aspect", "1:1"), ver)
@@ -51,6 +51,11 @@ def gen(s):
             except Exception as e:
                 last = f"{model}/{ver} {e}"
     raise RuntimeError(last)
+
+def _clean(v): return (v or "").strip().strip("()").strip().strip("'\"")
+for _k in ("GEMINI_API_KEY", "GEMINI_IMAGE_MODEL"):
+    if _k in os.environ: os.environ[_k] = _clean(os.environ[_k])
+if os.environ.get("GEMINI_IMAGE_MODEL", "").startswith("비워두면"): os.environ.pop("GEMINI_IMAGE_MODEL")
 
 if __name__ == "__main__":
     if not os.environ.get("GEMINI_API_KEY"):
