@@ -1,7 +1,8 @@
 """Gemini(나노 바나나)로 블로그용 사진 생성 → 로컬 JPG 저장. thumbs.py P 스타일의 "photo"나 본문 이미지로 그대로 쓴다.
 
 키: 환경변수 GEMINI_API_KEY (노션 '도구 설정 (API 키)' 페이지에서 읽어 export. 키 값은 글·노션 본문·커밋·로그에 절대 쓰지 말 것).
-모델: 환경변수 GEMINI_IMAGE_MODEL 이 있으면 그것, 없으면 gemini-nano-banana-2.1 → gemini-3.1-flash-lite-image → gemini-2.5-flash-image 순서로 시도.
+모델: 환경변수 GEMINI_IMAGE_MODEL 이 있으면 그것, 없으면 gemini-3.1-flash-lite-image(가장 저렴) → gemini-3.1-flash-image(512px, 장당 약 $0.045) 순서.
+비용 규칙: 하루 최대 2장(경제콩·멘토콩 홈판형 글 썸네일 사진만). 나머지 글은 photos.py 무료 사진·표지 카드·H 스타일.
 
 사용:
   python3 tools/gen_image.py spec.json
@@ -18,16 +19,17 @@
 import base64, io, json, os, sys, urllib.request, urllib.error
 from PIL import Image
 
-MODELS = ["gemini-nano-banana-2.1", "gemini-3.1-flash-lite-image", "gemini-2.5-flash-image"]
+MODELS = ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"]  # 비용 순(2026-11-16 사용자: 싸게). flash-image는 512px로만
 GUARD = (" Style: natural editorial photograph, realistic lighting, shallow depth of field, Korean everyday setting when relevant."
          " Strictly no text, letters, numbers, captions or watermarks in the image. No logos, no brand names, no real product packaging."
          " No identifiable real or famous people; if people appear, show them from behind, hands only, or out of focus."
          " Not a medical document, X-ray, chart, prescription or screenshot.")
 
 def call(model, prompt, aspect, ver):
+    size = "512" if model == "gemini-3.1-flash-image" else None
     url = f"https://generativelanguage.googleapis.com/{ver}/models/{model}:generateContent"
     body = {"contents": [{"parts": [{"text": prompt + GUARD}]}],
-            "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect}}}
+            "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect, **({"imageSize": size} if size else {})}}}
     req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json", "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
     with urllib.request.urlopen(req, timeout=120) as r:
         d = json.load(r)
@@ -37,7 +39,7 @@ def call(model, prompt, aspect, ver):
 
 def gen(s):
     last = ""
-    models = [os.environ["GEMINI_IMAGE_MODEL"]] if os.environ.get("GEMINI_IMAGE_MODEL") else MODELS[-3:]
+    models = [os.environ["GEMINI_IMAGE_MODEL"]] if os.environ.get("GEMINI_IMAGE_MODEL") else MODELS
     for model in models:
         for ver in ("v1", "v1beta"):
             try:
