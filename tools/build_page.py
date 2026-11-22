@@ -53,6 +53,7 @@ def to_naver(body, sha, tags=""):
     b = re.sub(r"<h3>(.*?)</h3>", BLANK + r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
     if tags.strip():  # 본문 맨 끝 해시태그 줄: 네이버가 본문 #태그를 태그로 자동 등록하는지 사용자 테스트용
         b += BLANK + f'<p style="text-align:center">{html.escape(tag_line(tags))}</p>'
+    b = b.replace('<p style="text-align:center">', '<p style="text-align:center;color:#000000">')  # 다크모드 기기에서 흰 글씨로 붙는 것 방지
     return b
 
 def logo_uri(name, h=110):
