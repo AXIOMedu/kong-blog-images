@@ -118,7 +118,12 @@ def build(spec):
 <button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button>
 {'<button type="button" class="cnbtn" data-act="cn" data-i="'+str(i)+'" aria-expanded="false">카드뉴스로 추출</button>' if has_cards else ""}
 <button type="button" class="clbtn" data-act="clip" data-i="{i}" aria-expanded="false">클립 만들기</button>
+<button type="button" class="mbbtn" data-act="mb" data-i="{i}" aria-expanded="false">모바일 순서대로</button>
 <span class="status" id="s{i}" role="status"></span></div>
+<div class="mb" id="mb{i}" hidden><p class="cnhead">아이패드·폰 네이버 앱용: 위에서부터 순서대로</p>
+<p class="clnote">① 사진 전부 앨범에 저장 → ② 글 조각 '복사' 후 앱에 붙여넣기 → 사진 자리에서 앨범 사진 넣기 → 다음 조각. 누른 칸은 흐려져서 어디까지 했는지 보여.</p>
+<div class="actions"><button type="button" data-act="mball" data-i="{i}">사진 전부 앨범에 저장</button><button type="button" class="ghost" data-act="title" data-i="{i}">제목 복사</button><button type="button" class="ghost" data-act="tags" data-i="{i}">태그 복사</button></div>
+<ol class="mblist" id="mbl{i}"></ol></div>
 {cn}<div class="cl" id="cl{i}" hidden><canvas width="1080" height="1920" id="cv{i}"></canvas><div class="clside">
 <p class="cnhead">네이버 클립용 세로 영상 (9:16, 약 30초)</p>
 <p class="clnote">썸네일 → 본문 이미지 → 마무리 순서로, 자막·효과음·배경음이 들어가. 저장 중엔 화면을 켜두고 이 탭을 벗어나지 마.</p>
@@ -195,6 +200,15 @@ article .red { color:var(--red); } article .blue { color:var(--blue); }
 .igcap { margin:0; white-space:pre-wrap; font:.85rem/1.6 var(--body); color:var(--muted); max-height:9em; overflow:auto; }
 .warn { margin:0; padding:12px 16px; border-radius:8px; background:var(--deep); color:#fff; font-weight:700; line-height:1.6; }
 hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
+.mbbtn { background:#1f6feb; color:#fff; }
+.mb { background:var(--paper); border:2px solid #1f6feb; border-radius:10px; padding:14px; display:grid; gap:10px; }
+.mb[hidden] { display:none; }
+.mblist { margin:0; padding-left:1.4em; display:grid; gap:8px; }
+.mblist li { display:flex; gap:10px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+.mblist li.done { opacity:.45; }
+.mblist .mbtxt { font-size:.85rem; line-height:1.5; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; min-width:0; flex:1; }
+.mblist img { width:56px; height:56px; object-fit:cover; border-radius:6px; flex:none; }
+.mblist button { flex:none; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 <div class="wrap">
@@ -261,6 +275,10 @@ document.addEventListener('click', e => {
   if (act === 'clplay') runClip(i, false);
   if (act === 'clrec') runClip(i, true);
   if (act === 'cltxt') copyText(i, DATA[i].cliptext, '클립 설명·해시태그');
+  if (act === 'mb') toggleMobile(i, b);
+  if (act === 'mball') saveAllPhotos(i);
+  if (act === 'mbtxt') mbCopy(i, +b.dataset.k, b);
+  if (act === 'mbimg') mbSave(i, +b.dataset.k, b);
 });
 const LOGOS = __LOGOS__;
 const LOGO_H = { prime: 40, hanbit: 46, onbit: 34 }, BRAND_NAME = { AXIOM: 'AXIOM', prime: '더프라임멘토링', hanbit: '한빛수학학원', onbit: '온빛관리형스터디랩' };
@@ -327,6 +345,68 @@ async function saveZip(i) {
 const BRAND = "__BRAND__";
 const CW = 1080, CH = 1920, FONT = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
 let clipBusy = false;
+const MB = {};
+function mbText(el) {
+  if (el.tagName === 'H3') return '■ ' + el.textContent.trim();
+  const c = el.cloneNode(true); c.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+  return c.textContent.replace(/[ \t]+\n/g, '\n').trim();
+}
+function buildMobile(i) {
+  const art = document.getElementById('a' + i), blocks = []; let buf = [];
+  const flush = () => { if (buf.length) { blocks.push({ text: buf.join('\n\n') }); buf = []; } };
+  [...art.children].forEach(el => {
+    const im = el.tagName === 'IMG' ? el : el.querySelector && el.querySelector('img');
+    if (im) { flush(); blocks.push({ img: im }); return; }
+    if (el.tagName === 'DIV' && /실사진/.test(el.textContent)) { flush(); blocks.push({ ph: true }); return; }
+    const s = mbText(el); if (s) buf.push(s);
+  });
+  flush(); MB[i] = blocks;
+  const ol = document.getElementById('mbl' + i); let n = 0;
+  ol.innerHTML = blocks.map((b, k) => {
+    if (b.img) { n++; return `<li><img alt="" src="${b.img.src}"><span class="mbtxt">사진 ${n}${n === 1 ? ' (썸네일)' : ''}</span><button type="button" class="ghost" data-act="mbimg" data-i="${i}" data-k="${k}">이 사진 저장</button></li>`; }
+    if (b.ph) return `<li><span class="mbtxt">실사진 자리: PC 발행함에서만 들어가요(건너뛰어도 됨)</span></li>`;
+    const pv = b.text.slice(0, 70).replace(/[<>&]/g, '');
+    return `<li><span class="mbtxt">${pv}</span><button type="button" data-act="mbtxt" data-i="${i}" data-k="${k}">복사</button></li>`;
+  }).join('');
+}
+function toggleMobile(i, b) {
+  const box = document.getElementById('mb' + i);
+  if (!MB[i]) buildMobile(i);
+  box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden));
+  b.textContent = box.hidden ? '모바일 순서대로' : '모바일 닫기';
+}
+async function mbCopy(i, k, b) {
+  const t = MB[i][k].text;
+  try { await navigator.clipboard.writeText(t); b.closest('li').classList.add('done'); say(i, '조각 복사됨. 앱에 붙여넣어 줘.'); }
+  catch (e) { say(i, '복사가 막혔어. 길게 눌러 선택해서 복사해줘.'); }
+}
+async function imgFile(im, name) {
+  const blob = await (await fetch(im.src)).blob();
+  const ext = blob.type.includes('png') ? 'png' : 'jpg';
+  return new File([blob], name + '.' + ext, { type: blob.type || 'image/jpeg' });
+}
+async function getDL() { try { return await window.claude?.use?.('downloads'); } catch (_) { return null; } }
+async function mbSave(i, k, b) {
+  const idx = MB[i].filter((x, j) => x.img && j <= k).length;
+  const f = await imgFile(MB[i][k].img, `p${i + 1}_${String(idx).padStart(2, '0')}`);
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f] });
+    else { const dl = await getDL(); if (!dl) throw 0; await dl.save({ filename: f.name, data: f }); }
+    b.closest('li').classList.add('done'); say(i, '사진 저장됨.');
+  } catch (e) { say(i, '저장이 막혔어. 사진을 길게 눌러 "사진에 저장"으로 해줘.'); }
+}
+async function saveAllPhotos(i) {
+  if (!MB[i]) buildMobile(i);
+  const ims = MB[i].filter(x => x.img).map(x => x.img);
+  if (!ims.length) { say(i, '저장할 사진이 없어.'); return; }
+  const files = await Promise.all(ims.map((im, k) => imgFile(im, `p${i + 1}_${String(k + 1).padStart(2, '0')}`)));
+  try {
+    if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files }); say(i, `사진 ${files.length}장 공유창 열림 → "이미지 저장" 눌러줘.`); return; }
+    const dl = await getDL(); if (!dl) throw 0;
+    for (const f of files) await dl.save({ filename: f.name, data: f });
+    say(i, `사진 ${files.length}장 저장됨.`);
+  } catch (e) { say(i, '한 번에 저장이 막혔어. 아래 사진별 "이 사진 저장"을 눌러줘.'); }
+}
 function say2(i, t) { const el = document.getElementById('cs' + i); if (el) el.textContent = t; }
 function toggleClip(i, b) {
   const box = document.getElementById('cl' + i);
