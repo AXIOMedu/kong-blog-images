@@ -15,6 +15,7 @@ post에 "slot":"아침|점심|저녁|밤" 을 넣으면 추천 발행 시간(아
   "ig_caption":"인스타 캡션" 은 이 패널 안에서만 보임. "cardnews_zip"(선택)은 저장 기능이 막힐 때 쓰는 예비 링크.
 클립(네이버 클립 숏폼, 9:16 MP4): 모든 글에 '클립 만들기' 버튼. 누르면 브라우저가 썸네일→본문 이미지(최대 5장)→마무리 화면을
   자막·효과음·배경음과 함께 바로 녹화(약 25~30초). 자막은 각 이미지 아래 "▲ 캡션"을 그대로 씀(토큰 0).
+  글 끝 독자 질문은 <p class='ask'>질문?</p> 로 쓴다 → 복사본에서 위아래 빈 줄 + 굵게 + 크게 + 노란 형광펜 + 💬. (안 붙여도 마지막 물음표 문장을 자동으로 찾아 강조)
   post에 "clip":{"hook":"상단 고정 문구(20자 안팎)","caps":["장면별 자막", ...]} 를 넣으면 그걸 우선 사용(선택).
   오늘클립챌린지용(선택): "clip":{"desc":"클립 설명 1~2줄","hashtags":"#오늘클립챌린지 #... (5~8개)","info_tag":"정보태그 제안(예: 쇼핑 — 『이기적 유전자』 책)"}
   → 클립 패널에 정보태그 제안 + '설명·해시태그 복사' 버튼. 없으면 제목 + #오늘클립챌린지 + 본문 태그 앞 4개로 자동.
@@ -38,7 +39,18 @@ def tag_line(tags):
     ts = [t.replace(" ", "") for t in re.split(r"[#,\s]*#", " " + tags) if t.strip()]
     return " ".join("#" + t.strip("#,") for t in ts if t.strip("#,"))
 
+def mark_ask(body):
+    """글 끝 독자 질문에 class='ask'가 없으면 자동으로 붙인다: 마지막 800자 안에서 '?'로 끝나고 'Q.'로 시작하지 않는 마지막 <p>."""
+    if re.search(r"<p class=['\"]ask['\"]>", body): return body
+    cut = max(0, len(body) - 1200); head, tail = body[:cut], body[cut:]
+    ms = [m for m in re.finditer(r"<p>((?:(?!</p>).)*?\?)\s*</p>", tail, flags=re.S)
+          if not re.sub(r"<[^>]+>", "", m.group(1)).strip().startswith("Q") and "<a " not in m.group(1)]
+    if not ms: return body
+    m = ms[-1]
+    return head + tail[:m.start()] + "<p class='ask'>" + m.group(1) + "</p>" + tail[m.end():]
+
 def to_naver(body, sha, tags=""):
+    body = mark_ask(body)
     body = re.sub(r"<img[^>]*>", "", body, count=1)  # 썸네일은 '썸네일 복사' 버튼으로 따로 붙여넣음(대표 사진 지정용)
     if not sha:  # 업로드 실패 시: 저장소 이미지만 제외(외부 사진 주소는 유지)
         body = re.sub(r"<img(?![^>]*src=['\"]http)[^>]*>", "", body)
@@ -53,6 +65,7 @@ def to_naver(body, sha, tags=""):
     b = re.sub(r"<h3>(.*?)</h3>", BLANK + r'<p style="text-align:center"><b><span style="font-size:19px">\1</span></b></p>', b, flags=re.S)
     if tags.strip():  # 본문 맨 끝 해시태그 줄: 네이버가 본문 #태그를 태그로 자동 등록하는지 사용자 테스트용
         b += BLANK + f'<p style="text-align:center">{html.escape(tag_line(tags))}</p>'
+    b = re.sub(r"<p class=['\"]ask['\"]>(.*?)</p>", lambda m: BLANK + BLANK + '<p style="text-align:center"><b><span style="font-size:19px;background-color:#fff3a3">💬 ' + m.group(1) + '</span></b></p>' + BLANK, b, flags=re.S)
     b = b.replace('<p style="text-align:center">', '<p style="text-align:center;color:#000000">')  # 다크모드 기기에서 흰 글씨로 붙는 것 방지
     return b
 
@@ -133,7 +146,7 @@ def build(spec):
 <p class="clnote">오늘클립챌린지: 정보태그 필수 → {html.escape((p.get("clip") or {}).get("info_tag") or "장소·쇼핑·공연전시축제 중 하나(예: 관련 책을 쇼핑태그로)")} · 전체공개 · 해시태그는 설명 뒤에</p>
 <div class="actions"><button type="button" class="ghost" data-act="cltxt" data-i="{i}">설명·해시태그 복사</button></div>
 <p class="status" id="cs{i}" role="status"></p></div></div>{cat}<p class="tags">{html.escape(p.get("tags", ""))}</p>{gpt}
-<article id="a{i}">{to_preview(p["body"])}</article></section>''')
+<article id="a{i}">{to_preview(mark_ask(p["body"]))}</article></section>''')
     if not secs:
         secs.append('<section class="post"><article><p>아직 올라온 글이 없어.</p><p>매일 새벽 6시쯤 그날의 글이 여기 채워져.</p></article></section>')
     warn = "" if spec.get("sha") else '<p class="warn">오늘은 이미지 업로드가 실패했어. 본문 복사엔 사진이 빠져 있으니, 미리보기 사진을 우클릭 → 이미지 복사로 넣어줘.</p>'
@@ -210,6 +223,8 @@ hr { border:0; border-top:1px solid var(--line); margin:8px 0; width:100%; }
 .mblist .mbtxt { font-size:.85rem; line-height:1.5; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; min-width:0; flex:1; }
 .mblist img { width:56px; height:56px; object-fit:cover; border-radius:6px; flex:none; }
 .mblist button { flex:none; }
+article p.ask { margin:2.2em 0 1.2em; font-weight:700; font-size:1.12em; }
+article p.ask::before { content:'💬 '; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 <div class="wrap">
